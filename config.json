@@ -29,6 +29,7 @@
   },
   "other": {
     "timeout": 300000,
+    "retryTimes": 3,
     "skipProjectIdFetch": false,
     "useNativeAxios": false
   }

@@ -196,6 +196,15 @@ function buildRequesterConfig(headers, body = null) {
   return reqConfig;
 }
 
+// 统一构造上游 API 错误对象，方便服务器层识别并透传
+function createApiError(message, status, rawBody) {
+  const err = new Error(message);
+  err.status = status;
+  err.rawBody = rawBody;
+  err.isUpstreamApiError = true;
+  return err;
+}
+
 // 统一错误处理
 async function handleApiError(error, token) {
   const status = error.response?.status || error.status || 'Unknown';
@@ -215,13 +224,13 @@ async function handleApiError(error, token) {
   
   if (status === 403) {
     if (JSON.stringify(errorBody).includes("The caller does not")){
-      throw new Error(`超出模型最大上下文。错误详情: ${errorBody}`);
+      throw createApiError(`超出模型最大上下文。错误详情: ${errorBody}`, status, errorBody);
     }
     tokenManager.disableCurrentToken(token);
-    throw new Error(`该账号没有使用权限，已自动禁用。错误详情: ${errorBody}`);
+    throw createApiError(`该账号没有使用权限，已自动禁用。错误详情: ${errorBody}`, status, errorBody);
   }
   
-  throw new Error(`API请求失败 (${status}): ${errorBody}`);
+  throw createApiError(`API请求失败 (${status}): ${errorBody}`, status, errorBody);
 }
 
 // 转换 functionCall 为 OpenAI 格式（使用对象池）

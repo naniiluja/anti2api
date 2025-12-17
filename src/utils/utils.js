@@ -3,6 +3,9 @@ import tokenManager from '../auth/token_manager.js';
 import { generateRequestId } from './idGenerator.js';
 import os from 'os';
 
+// 思维链签名占位（用于启用思考模型但没有真实签名时）
+const DEFAULT_THOUGHT_SIGNATURE = 'RXFRRENrZ0lDaEFDR0FJcVFKV1Bvcy9GV20wSmtMV2FmWkFEbGF1ZTZzQTdRcFlTc1NvbklmemtSNFo4c1dqeitIRHBOYW9hS2NYTE1TeTF3bjh2T1RHdE1KVjVuYUNQclZ5cm9DMFNETHk4M0hOSWsrTG1aRUhNZ3hvTTl0ZEpXUDl6UUMzOExxc2ZJakI0UkkxWE1mdWJ1VDQrZnY0Znp0VEoyTlhtMjZKL2daYi9HL1gwcmR4b2x0VE54empLemtLcEp0ZXRia2plb3NBcWlRSWlXUHloMGhVVTk1dHNha1dyNDVWNUo3MTJjZDNxdHQ5Z0dkbjdFaFk4dUllUC9CcThVY2VZZC9YbFpYbDc2bHpEbmdzL2lDZXlNY3NuZXdQMjZBTDRaQzJReXdibVQzbXlSZmpld3ZSaUxxOWR1TVNidHIxYXRtYTJ0U1JIRjI0Z0JwUnpadE1RTmoyMjR4bTZVNUdRNXlOSWVzUXNFNmJzRGNSV0RTMGFVOEZERExybmhVQWZQT2JYMG5lTGR1QnU1VGZOWW9NZGlRbTgyUHVqVE1xaTlmN0t2QmJEUUdCeXdyVXR2eUNnTEFHNHNqeWluZDRCOEg3N2ZJamt5blI3Q3ZpQzlIOTVxSENVTCt3K3JzMmsvV0sxNlVsbGlTK0pET3UxWXpPMWRPOUp3V3hEMHd5ZVU0a0Y5MjIxaUE5Z2lUd2djZXhSU2c4TWJVMm1NSjJlaGdlY3g0YjJ3QloxR0FFPQ==';
+
 function extractImagesFromContent(content) {
   const result = { text: '', images: [] };
 
@@ -50,7 +53,25 @@ function handleUserMessage(extracted, antigravityMessages){
     ]
   })
 }
-function handleAssistantMessage(message, antigravityMessages){
+// 将工具名称规范为 Vertex 要求的格式：^[a-zA-Z0-9_-]{1,128}$
+function sanitizeToolName(name) {
+  if (!name || typeof name !== 'string') {
+    return 'tool';
+  }
+  // 替换非法字符为下划线
+  let cleaned = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  // 去掉首尾多余下划线
+  cleaned = cleaned.replace(/^_+|_+$/g, '');
+  if (!cleaned) {
+    cleaned = 'tool';
+  }
+  // 限制最大长度 128
+  if (cleaned.length > 128) {
+    cleaned = cleaned.slice(0, 128);
+  }
+  return cleaned;
+}
+function handleAssistantMessage(message, antigravityMessages, enableThinking){
   const lastMessage = antigravityMessages[antigravityMessages.length - 1];
   const hasToolCalls = message.tool_calls && message.tool_calls.length > 0;
   const hasContent = message.content && message.content.trim() !== '';
@@ -58,17 +79,42 @@ function handleAssistantMessage(message, antigravityMessages){
   const antigravityTools = hasToolCalls ? message.tool_calls.map(toolCall => ({
     functionCall: {
       id: toolCall.id,
-      name: toolCall.function.name,
+      name: sanitizeToolName(toolCall.function.name),
       args: {
         query: toolCall.function.arguments
       }
     }
   })) : [];
-  
+
   if (lastMessage?.role === "model" && hasToolCalls && !hasContent){
     lastMessage.parts.push(...antigravityTools)
   }else{
     const parts = [];
+
+    // 对于启用思考的模型，在历史 assistant 消息中补一个思考块 + 签名块
+    // 结构示例：
+    // {
+    //   "role": "model",
+    //   "parts": [
+    //     { "text": "␈", "thought": true },
+    //     { "text": "␈", "thoughtSignature": "..." },
+    //     { "text": "正常回复..." }
+    //   ]
+    // }
+    if (enableThinking) {
+      // 默认思考内容不能是完全空字符串，否则上游会要求 thinking 字段
+      // 这里用一个不可见的退格符作为占位，实际展示时等价于“空思考块”
+      let reasoningText = '';
+      if (typeof message.reasoning_content === 'string' && message.reasoning_content.length > 0) {
+        reasoningText = message.reasoning_content;
+      } else {
+        reasoningText = ' '; // 退格符占位
+      }
+      parts.push({ text: reasoningText, thought: true });
+      // 思维链签名占位，避免上游校验缺少签名字段
+      parts.push({ text: ' ', thoughtSignature: DEFAULT_THOUGHT_SIGNATURE });
+    }
+
     if (hasContent) parts.push({ text: message.content.trimEnd() });
     parts.push(...antigravityTools);
     
@@ -115,7 +161,7 @@ function handleToolCall(message, antigravityMessages){
     });
   }
 }
-function openaiMessageToAntigravity(openaiMessages){
+function openaiMessageToAntigravity(openaiMessages, enableThinking){
   const antigravityMessages = [];
   for (const message of openaiMessages) {
     if (message.role === "user") {
@@ -126,7 +172,7 @@ function openaiMessageToAntigravity(openaiMessages){
       const extracted = extractImagesFromContent(message.content);
       handleUserMessage(extracted, antigravityMessages);
     } else if (message.role === "assistant") {
-      handleAssistantMessage(message, antigravityMessages);
+      handleAssistantMessage(message, antigravityMessages, enableThinking);
     } else if (message.role === "tool") {
       handleToolCall(message, antigravityMessages);
     }
@@ -279,10 +325,12 @@ function convertOpenAIToolsToAntigravity(openaiTools){
       cleanedParams.properties = {};
     }
 
+    const safeName = sanitizeToolName(tool.function?.name);
+
     return {
       functionDeclarations: [
         {
-          name: tool.function.name,
+          name: safeName,
           description: tool.function.description,
           parameters: cleanedParams
         }
@@ -334,7 +382,7 @@ function generateRequestBody(openaiMessages,modelName,parameters,openaiTools,tok
     project: token.projectId,
     requestId: generateRequestId(),
     request: {
-      contents: openaiMessageToAntigravity(filteredMessages),
+      contents: openaiMessageToAntigravity(filteredMessages, enableThinking),
       tools: convertOpenAIToolsToAntigravity(openaiTools),
       toolConfig: {
         functionCallingConfig: {

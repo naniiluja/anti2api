@@ -1242,6 +1242,7 @@ async function loadConfig() {
             }
             if (json.other) {
                 if (form.elements['TIMEOUT']) form.elements['TIMEOUT'].value = json.other.timeout ?? '';
+                if (form.elements['RETRY_TIMES']) form.elements['RETRY_TIMES'].value = json.other.retryTimes ?? '';
                 if (form.elements['SKIP_PROJECT_ID_FETCH']) form.elements['SKIP_PROJECT_ID_FETCH'].value = json.other.skipProjectIdFetch ? 'true' : 'false';
             }
             // 加载轮询策略配置
@@ -1298,6 +1299,10 @@ document.getElementById('configForm').addEventListener('submit', async (e) => {
                 jsonConfig.defaults.thinkingBudget = Number.isNaN(num) ? undefined : num;
             }
             else if (key === 'TIMEOUT') jsonConfig.other.timeout = parseInt(value) || undefined;
+            else if (key === 'RETRY_TIMES') {
+                const num = parseInt(value);
+                jsonConfig.other.retryTimes = Number.isNaN(num) ? undefined : num;
+            }
             else if (key === 'SKIP_PROJECT_ID_FETCH') jsonConfig.other.skipProjectIdFetch = value === 'true';
             else if (key === 'ROTATION_STRATEGY') jsonConfig.rotation.strategy = value || undefined;
             else if (key === 'ROTATION_REQUEST_COUNT') jsonConfig.rotation.requestCount = parseInt(value) || undefined;

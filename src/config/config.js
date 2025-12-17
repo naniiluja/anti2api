@@ -90,6 +90,8 @@ const config = {
   },
   useNativeAxios: jsonConfig.other?.useNativeAxios !== false,
   timeout: jsonConfig.other?.timeout || 300000,
+  // 默认 429 重试次数（统一配置，0 表示不重试，默认 3 次）
+  retryTimes: Number.isFinite(jsonConfig.other?.retryTimes) ? jsonConfig.other.retryTimes : 3,
   proxy: getProxyConfig(),
   systemInstruction: process.env.SYSTEM_INSTRUCTION || '',
   skipProjectIdFetch: jsonConfig.other?.skipProjectIdFetch === true

@@ -259,10 +259,27 @@ curl http://localhost:8045/v1/chat/completions \
   -d '{
     "model": "gemini-2.5-pro",
     "messages": [{"role": "user", "content": "证明勾股定理"}],
-    "stream": true,
+      "stream": true,
     "thinking_budget": 24000
   }'
 ```
+
+### 429 自动重试配置
+
+所有 429 重试次数仅通过服务端配置控制：
+
+- 全局默认重试次数（服务端配置）：
+  - 文件：`config.json` 中的 `other.retryTimes`
+  - 示例：
+    ```json
+    "other": {
+      "timeout": 300000,
+      "retryTimes": 3,
+      "skipProjectIdFetch": false,
+      "useNativeAxios": false
+    }
+    ```
+  - 服务器始终使用这里配置的值作为 429 时的重试次数（默认 3 次）。
 
 ### 思维链响应格式
 
