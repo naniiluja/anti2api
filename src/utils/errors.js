@@ -136,6 +136,21 @@ export function createApiError(message, status, rawBody) {
 }
 
 /**
+ * 从错误对象中提取消息
+ * @param {Error} error - 错误对象
+ * @returns {string}
+ */
+function extractErrorMessage(error) {
+  if (error.isUpstreamApiError && error.rawBody) {
+    try {
+      const raw = typeof error.rawBody === 'string' ? JSON.parse(error.rawBody) : error.rawBody;
+      return raw.error?.message || raw.message || error.message;
+    } catch {}
+  }
+  return error.message || 'Internal server error';
+}
+
+/**
  * 构建 OpenAI 兼容的错误响应
  * @param {Error} error - 错误对象
  * @param {number} statusCode - HTTP 状态码
@@ -182,6 +197,43 @@ export function buildOpenAIErrorPayload(error, statusCode) {
       message: error.message || 'Internal server error',
       type: 'server_error',
       code: statusCode
+    }
+  };
+}
+
+/**
+ * 构建 Gemini 兼容的错误响应
+ * @param {Error} error - 错误对象
+ * @param {number} statusCode - HTTP 状态码
+ * @returns {{error: {code: number, message: string, status: string}}}
+ */
+export function buildGeminiErrorPayload(error, statusCode) {
+  return {
+    error: {
+      code: statusCode,
+      message: extractErrorMessage(error),
+      status: "INTERNAL"
+    }
+  };
+}
+
+/**
+ * 构建 Claude 兼容的错误响应
+ * @param {Error} error - 错误对象
+ * @param {number} statusCode - HTTP 状态码
+ * @returns {{type: string, error: {type: string, message: string}}}
+ */
+export function buildClaudeErrorPayload(error, statusCode) {
+  const errorType = statusCode === 401 ? "authentication_error" :
+                    statusCode === 429 ? "rate_limit_error" :
+                    statusCode === 400 ? "invalid_request_error" :
+                    "api_error";
+  
+  return {
+    type: "error",
+    error: {
+      type: errorType,
+      message: extractErrorMessage(error)
     }
   };
 }

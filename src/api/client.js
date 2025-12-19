@@ -3,10 +3,10 @@ import config from '../config/config.js';
 import AntigravityRequester from '../AntigravityRequester.js';
 import { saveBase64Image } from '../utils/imageStorage.js';
 import logger from '../utils/logger.js';
-import memoryManager, { MemoryPressure, registerMemoryPoolCleanup } from '../utils/memoryManager.js';
-import { buildAxiosRequestConfig, httpRequest, httpStreamRequest } from '../utils/httpClient.js';
+import memoryManager, { MemoryPressure } from '../utils/memoryManager.js';
+import { httpRequest, httpStreamRequest } from '../utils/httpClient.js';
 import { MODEL_LIST_CACHE_TTL } from '../constants/index.js';
-import { createApiError, UpstreamApiError } from '../utils/errors.js';
+import { createApiError } from '../utils/errors.js';
 import {
   getLineBuffer,
   releaseLineBuffer,
@@ -15,7 +15,6 @@ import {
   registerStreamMemoryCleanup
 } from './stream_parser.js';
 import { setReasoningSignature, setToolSignature } from '../utils/thoughtSignatureCache.js';
-import { getOriginalToolName } from '../utils/toolNameCache.js';
 
 // 请求客户端：优先使用 AntigravityRequester，失败则降级到 axios
 let requester = null;
@@ -133,7 +132,7 @@ function buildRequesterConfig(headers, body = null) {
 
 // 统一错误处理
 async function handleApiError(error, token) {
-  const status = error.response?.status || error.status || 'Unknown';
+  const status = error.response?.status || error.status || error.statusCode || 500;
   let errorBody = error.message;
   
   if (error.response?.data?.readable) {

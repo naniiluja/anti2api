@@ -12,7 +12,7 @@ import sdRouter from '../routes/sd.js';
 import memoryManager, { registerMemoryPoolCleanup } from '../utils/memoryManager.js';
 import { getPublicDir, getRelativePath } from '../utils/paths.js';
 import { DEFAULT_HEARTBEAT_INTERVAL, MEMORY_CHECK_INTERVAL } from '../constants/index.js';
-import { buildOpenAIErrorPayload, errorHandler, ValidationError } from '../utils/errors.js';
+import { buildOpenAIErrorPayload, buildGeminiErrorPayload, buildClaudeErrorPayload, errorHandler, ValidationError } from '../utils/errors.js';
 
 const publicDir = getPublicDir();
 
@@ -125,25 +125,7 @@ const endStream = (res) => {
 };
 
 
-// Gemini 兼容错误响应构造
-const buildGeminiErrorPayload = (error, statusCode) => {
-  // 尝试解析原始错误信息
-  let message = error.message || 'Internal server error';
-  if (error.isUpstreamApiError && error.rawBody) {
-    try {
-      const raw = typeof error.rawBody === 'string' ? JSON.parse(error.rawBody) : error.rawBody;
-      message = raw.error?.message || raw.message || message;
-    } catch {}
-  }
 
-  return {
-    error: {
-      code: statusCode,
-      message: message,
-      status: "INTERNAL" // 简单映射，实际可根据 statusCode 细化
-    }
-  };
-};
 
 // Gemini 响应构建工具
 const createGeminiResponse = (content, reasoning, reasoningSignature, toolCalls, finishReason, usage) => {
@@ -394,15 +376,9 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
   } catch (error) {
     logger.error('生成响应失败:', error.message);
-    // 如果已经开始写响应，就不再追加错误内容，避免协议冲突
-    if (res.headersSent) {
-      return;
-    }
-
-    // OpenAI 兼容错误返回：HTTP 状态码 + { error: { message, type, code } }
-    const statusCode = Number(error.status) || 500;
-    const errorPayload = buildOpenAIErrorPayload(error, statusCode);
-    return res.status(statusCode).json(errorPayload);
+    if (res.headersSent) return;
+    const statusCode = error.statusCode || error.status || 500;
+    return res.status(statusCode).json(buildOpenAIErrorPayload(error, statusCode));
   }
 });
 
@@ -516,11 +492,9 @@ const handleGeminiRequest = async (req, res, modelName, isStream) => {
         endStream(res);
       } catch (error) {
         clearInterval(heartbeatTimer);
-        // 流式响应中发送错误
         if (!res.writableEnded) {
-          const statusCode = Number(error.status) || 500;
-          const errorPayload = buildGeminiErrorPayload(error, statusCode);
-          writeStreamData(res, errorPayload);
+          const statusCode = error.statusCode || error.status || 500;
+          writeStreamData(res, buildGeminiErrorPayload(error, statusCode));
           endStream(res);
         }
         logger.error('Gemini 流式请求失败:', error.message);
@@ -544,10 +518,8 @@ const handleGeminiRequest = async (req, res, modelName, isStream) => {
   } catch (error) {
     logger.error('Gemini 请求失败:', error.message);
     if (res.headersSent) return;
-
-    const statusCode = Number(error.status) || 500;
-    const errorPayload = buildGeminiErrorPayload(error, statusCode);
-    res.status(statusCode).json(errorPayload);
+    const statusCode = error.statusCode || error.status || 500;
+    res.status(statusCode).json(buildGeminiErrorPayload(error, statusCode));
   }
 };
 
@@ -564,27 +536,7 @@ app.post('/v1beta/models/:model\\:generateContent', (req, res) => {
 
 // ==================== Claude API ====================
 
-// Claude 错误响应构造
-const buildClaudeErrorPayload = (error, statusCode) => {
-  let message = error.message || 'Internal server error';
-  if (error.isUpstreamApiError && error.rawBody) {
-    try {
-      const raw = typeof error.rawBody === 'string' ? JSON.parse(error.rawBody) : error.rawBody;
-      message = raw.error?.message || raw.message || message;
-    } catch {}
-  }
 
-  return {
-    type: "error",
-    error: {
-      type: statusCode === 401 ? "authentication_error" :
-            statusCode === 429 ? "rate_limit_error" :
-            statusCode === 400 ? "invalid_request_error" :
-            "api_error",
-      message: message
-    }
-  };
-};
 
 // Claude 流式响应工具
 const createClaudeStreamEvent = (eventType, data) => {
@@ -831,11 +783,9 @@ const handleClaudeRequest = async (req, res, isStream) => {
         res.end();
       } catch (error) {
         clearInterval(heartbeatTimer);
-        // 流式响应中发送错误事件
         if (!res.writableEnded) {
-          const statusCode = Number(error.status) || 500;
-          const errorPayload = buildClaudeErrorPayload(error, statusCode);
-          res.write(createClaudeStreamEvent('error', errorPayload));
+          const statusCode = error.statusCode || error.status || 500;
+          res.write(createClaudeStreamEvent('error', buildClaudeErrorPayload(error, statusCode)));
           res.end();
         }
         logger.error('Claude 流式请求失败:', error.message);
@@ -869,10 +819,8 @@ const handleClaudeRequest = async (req, res, isStream) => {
   } catch (error) {
     logger.error('Claude 请求失败:', error.message);
     if (res.headersSent) return;
-    
-    const statusCode = Number(error.status) || 500;
-    const errorPayload = buildClaudeErrorPayload(error, statusCode);
-    res.status(statusCode).json(errorPayload);
+    const statusCode = error.statusCode || error.status || 500;
+    res.status(statusCode).json(buildClaudeErrorPayload(error, statusCode));
   }
 };
 

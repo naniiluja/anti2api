@@ -165,7 +165,7 @@ export function toGenerationConfig(normalized, enableThinking, actualModelName) 
     topK: normalized.top_k,
     temperature: normalized.temperature,
     candidateCount: 1,
-    maxOutputTokens: normalized.max_tokens,
+    maxOutputTokens: normalized.max_tokens || normalized.max_completion_tokens,
     thinkingConfig: {
       includeThoughts: actualEnableThinking,
       thinkingBudget: thinkingBudget
