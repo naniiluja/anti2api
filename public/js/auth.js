@@ -1,4 +1,4 @@
-// 认证相关：登录、登出、OAuth
+// Authentication: login, logout, OAuth
 
 let authToken = localStorage.getItem('authToken');
 let oauthPort = null;
@@ -12,12 +12,12 @@ const SCOPES = [
     'https://www.googleapis.com/auth/experimentsandconfigs'
 ].join(' ');
 
-// 封装fetch，自动处理401
+// Wrapper fetch with auto 401 handling
 const authFetch = async (url, options = {}) => {
     const response = await fetch(url, options);
     if (response.status === 401) {
         silentLogout();
-        showToast('登录已过期，请重新登录', 'warning');
+        showToast(t('messages.loginExpired'), 'warning');
         throw new Error('Unauthorized');
     }
     return response;
@@ -38,11 +38,11 @@ function silentLogout() {
 }
 
 async function logout() {
-    const confirmed = await showConfirm('确定要退出登录吗？', '退出确认');
+    const confirmed = await showConfirm(t('modals.logoutConfirm'), t('modals.confirmOperation'));
     if (!confirmed) return;
     
     silentLogout();
-    showToast('已退出登录', 'info');
+    showToast(t('messages.loggedOut'), 'info');
 }
 
 function getOAuthUrl() {
@@ -61,33 +61,33 @@ function openOAuthWindow() {
 function copyOAuthUrl() {
     const url = getOAuthUrl();
     navigator.clipboard.writeText(url).then(() => {
-        showToast('授权链接已复制', 'success');
+        showToast(t('messages.authLinkCopied'), 'success');
     }).catch(() => {
-        showToast('复制失败', 'error');
+        showToast(t('messages.copyFailed'), 'error');
     });
 }
 
 function showOAuthModal() {
-    showToast('点击后请在新窗口完成授权', 'info');
+    showToast(t('messages.clickThenAuth'), 'info');
     const modal = document.createElement('div');
     modal.className = 'modal form-modal';
     modal.innerHTML = `
         <div class="modal-content">
-            <div class="modal-title">🔐 OAuth授权登录</div>
+            <div class="modal-title">🔐 ${t('modals.oauthTitle')}</div>
             <div class="oauth-steps">
-                <p><strong>📝 授权流程：</strong></p>
-                <p>1️⃣ 点击下方按钮打开Google授权页面</p>
-                <p>2️⃣ 完成授权后，复制浏览器地址栏的完整URL</p>
-                <p>3️⃣ 粘贴URL到下方输入框并提交</p>
+                <p><strong>📝 ${t('modals.oauthSteps')}</strong></p>
+                <p>1️⃣ ${t('modals.oauthStep1')}</p>
+                <p>2️⃣ ${t('modals.oauthStep2')}</p>
+                <p>3️⃣ ${t('modals.oauthStep3')}</p>
             </div>
             <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                <button type="button" onclick="openOAuthWindow()" class="btn btn-success" style="flex: 1;">🔐 打开授权页面</button>
-                <button type="button" onclick="copyOAuthUrl()" class="btn btn-info" style="flex: 1;">📋 复制授权链接</button>
+                <button type="button" onclick="openOAuthWindow()" class="btn btn-success" style="flex: 1;">🔐 ${t('modals.openAuthPage')}</button>
+                <button type="button" onclick="copyOAuthUrl()" class="btn btn-info" style="flex: 1;">📋 ${t('modals.copyAuthLink')}</button>
             </div>
-            <input type="text" id="modalCallbackUrl" placeholder="粘贴完整的回调URL (http://localhost:xxxxx/oauth-callback?code=...)">
+            <input type="text" id="modalCallbackUrl" placeholder="${t('modals.pasteCallbackUrl')}">
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
-                <button class="btn btn-success" onclick="processOAuthCallbackModal()">✅ 提交</button>
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${t('buttons.cancel')}</button>
+                <button class="btn btn-success" onclick="processOAuthCallbackModal()">✅ ${t('modals.submit')}</button>
             </div>
         </div>
     `;
@@ -99,11 +99,11 @@ async function processOAuthCallbackModal() {
     const modal = document.querySelector('.form-modal');
     const callbackUrl = document.getElementById('modalCallbackUrl').value.trim();
     if (!callbackUrl) {
-        showToast('请输入回调URL', 'warning');
+        showToast(t('messages.pleaseInputUrl'), 'warning');
         return;
     }
     
-    showLoading('正在处理授权...');
+    showLoading(t('messages.processingAuth'));
     
     try {
         const url = new URL(callbackUrl);
@@ -112,7 +112,7 @@ async function processOAuthCallbackModal() {
         
         if (!code) {
             hideLoading();
-            showToast('URL中未找到授权码', 'error');
+            showToast(t('messages.noAuthCode'), 'error');
             return;
         }
         
@@ -142,19 +142,19 @@ async function processOAuthCallbackModal() {
             if (addResult.success) {
                 modal.remove();
                 const message = result.fallbackMode 
-                    ? 'Token添加成功（该账号无资格，已自动使用随机ProjectId）' 
-                    : 'Token添加成功';
+                    ? t('messages.tokenAddedWithFallback') 
+                    : t('messages.tokenAdded');
                 showToast(message, result.fallbackMode ? 'warning' : 'success');
                 loadTokens();
             } else {
-                showToast('添加失败: ' + addResult.message, 'error');
+                showToast(t('messages.addFailed') + ': ' + addResult.message, 'error');
             }
         } else {
             hideLoading();
-            showToast('交换失败: ' + result.message, 'error');
+            showToast(t('messages.exchangeFailed') + ': ' + result.message, 'error');
         }
     } catch (error) {
         hideLoading();
-        showToast('处理失败: ' + error.message, 'error');
+        showToast(t('messages.processFailed') + ': ' + error.message, 'error');
     }
 }

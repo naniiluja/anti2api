@@ -1,12 +1,12 @@
-// UI组件：Toast、Modal、Loading
+// UI Components: Toast, Modal, Loading
 
 function showToast(message, type = 'info', title = '') {
     const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-    const titles = { success: '成功', error: '错误', warning: '警告', info: '提示' };
+    const titleKeys = { success: 'toast.success', error: 'toast.error', warning: 'toast.warning', info: 'toast.info' };
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    // 转义用户输入防止 XSS
-    const safeTitle = escapeHtml(title || titles[type]);
+    // Escape input to prevent XSS
+    const safeTitle = escapeHtml(title || t(titleKeys[type]) || type);
     const safeMessage = escapeHtml(message);
     toast.innerHTML = `
         <div class="toast-icon">${icons[type]}</div>
@@ -34,8 +34,8 @@ function showConfirm(message, title = '确认操作') {
                 <div class="modal-title">${safeTitle}</div>
                 <div class="modal-message">${safeMessage}</div>
                 <div class="modal-actions">
-                    <button class="btn btn-secondary" onclick="this.closest('.modal').remove(); window.modalResolve(false)">取消</button>
-                    <button class="btn btn-danger" onclick="this.closest('.modal').remove(); window.modalResolve(true)">确定</button>
+                    <button class="btn btn-secondary" onclick="this.closest('.modal').remove(); window.modalResolve(false)">${t('buttons.cancel')}</button>
+                    <button class="btn btn-danger" onclick="this.closest('.modal').remove(); window.modalResolve(true)">${t('buttons.confirm')}</button>
                 </div>
             </div>
         `;

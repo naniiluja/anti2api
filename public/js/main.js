@@ -1,22 +1,27 @@
-// 主入口：初始化和事件绑定
+// Main entry: initialization and event bindings
 
-// 页面加载时初始化
-initFontSize();
-initSensitiveInfo();
-initFilterState(); // 恢复筛选状态
-
-// 如果已登录，显示主内容
-if (authToken) {
-    showMainContent();
-    restoreTabState(); // 恢复Tab状态
-    loadTokens();
-    // 只有在设置页面时才加载配置
-    if (localStorage.getItem('currentTab') === 'settings') {
-        loadConfig();
+// Initialize i18n first, then other components
+(async function() {
+    // Initialize i18n and wait for translations to load
+    await initI18n();
+    
+    // Initialize other components
+    initFontSize();
+    initSensitiveInfo();
+    initFilterState();
+    
+    // If logged in, show main content
+    if (authToken) {
+        showMainContent();
+        restoreTabState();
+        loadTokens();
+        if (localStorage.getItem('currentTab') === 'settings') {
+            loadConfig();
+        }
     }
-}
+})();
 
-// 登录表单提交
+// Login form submit
 document.getElementById('login').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
@@ -28,7 +33,7 @@ document.getElementById('login').addEventListener('submit', async (e) => {
     btn.disabled = true;
     btn.classList.add('loading');
     const originalText = btn.textContent;
-    btn.textContent = '登录中';
+    btn.textContent = t('messages.processing');
     
     try {
         const response = await fetch('/admin/login', {
@@ -41,15 +46,15 @@ document.getElementById('login').addEventListener('submit', async (e) => {
         if (data.success) {
             authToken = data.token;
             localStorage.setItem('authToken', authToken);
-            showToast('登录成功', 'success');
+            showToast(t('toast.success'), 'success');
             showMainContent();
             loadTokens();
             loadConfig();
         } else {
-            showToast(data.message || '用户名或密码错误', 'error');
+            showToast(data.message || t('messages.unknownError'), 'error');
         }
     } catch (error) {
-        showToast('登录失败: ' + error.message, 'error');
+        showToast(t('messages.operationFailed') + ': ' + error.message, 'error');
     } finally {
         btn.disabled = false;
         btn.classList.remove('loading');
@@ -57,5 +62,6 @@ document.getElementById('login').addEventListener('submit', async (e) => {
     }
 });
 
-// 配置表单提交
+// Config form submit
 document.getElementById('configForm').addEventListener('submit', saveConfig);
+

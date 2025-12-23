@@ -1,4 +1,4 @@
-// Token管理：增删改查、启用禁用
+// Token Management: CRUD, enable/disable
 
 let cachedTokens = [];
 let currentFilter = localStorage.getItem('tokenFilter') || 'all'; // 'all', 'enabled', 'disabled'
@@ -44,10 +44,10 @@ async function loadTokens() {
         if (data.success) {
             renderTokens(data.data);
         } else {
-            showToast('加载失败: ' + (data.message || '未知错误'), 'error');
+            showToast(t('messages.loadFailed') + ': ' + (data.message || t('messages.unknownError')), 'error');
         }
     } catch (error) {
-        showToast('加载Token失败: ' + error.message, 'error');
+        showToast(t('messages.loadTokensFailed') + ': ' + error.message, 'error');
     }
 }
 
@@ -74,9 +74,9 @@ function renderTokens(tokens) {
     
     const tokenList = document.getElementById('tokenList');
     if (filteredTokens.length === 0) {
-        const emptyText = currentFilter === 'all' ? '暂无Token' :
-                          currentFilter === 'enabled' ? '暂无启用的Token' : '暂无禁用的Token';
-        const emptyHint = currentFilter === 'all' ? '点击上方OAuth按钮添加Token' : '点击上方"总数"查看全部';
+        const emptyText = currentFilter === 'all' ? t('tokens.noTokens') :
+                          currentFilter === 'enabled' ? t('tokens.noEnabledTokens') : t('tokens.noDisabledTokens');
+        const emptyHint = currentFilter === 'all' ? t('tokens.clickOAuthHint') : t('tokens.clickTotalHint');
         tokenList.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">📦</div>
@@ -118,10 +118,10 @@ function renderTokens(tokens) {
         <div class="token-card ${!token.enable ? 'disabled' : ''} ${isExpired ? 'expired' : ''} ${isRefreshing ? 'refreshing' : ''} ${skipAnimation ? 'no-animation' : ''}" id="card-${escapeHtml(cardId)}">
             <div class="token-header">
                 <span class="status ${token.enable ? 'enabled' : 'disabled'}">
-                    ${token.enable ? '✅ 启用' : '❌ 禁用'}
+                    ${token.enable ? '✅ ' + t('tokens.enabled') : '❌ ' + t('tokens.disabled')}
                 </span>
                 <div class="token-header-right">
-                    <button class="btn-icon" onclick="showTokenDetail('${safeRefreshToken}')" title="编辑全部">✏️</button>
+                    <button class="btn-icon" onclick="showTokenDetail('${safeRefreshToken}')" title="${t('tokens.editAll')}">✏️</button>
                     <span class="token-id">#${tokenNumber}</span>
                 </div>
             </div>
@@ -130,20 +130,20 @@ function renderTokens(tokens) {
                     <span class="info-label">🎫</span>
                     <span class="info-value sensitive-info" title="${safeAccessTokenSuffix}">${safeAccessTokenSuffix}</span>
                 </div>
-                <div class="info-row editable sensitive-row" onclick="editField(event, '${safeRefreshToken}', 'projectId', '${safeProjectIdJs}')" title="点击编辑">
+                <div class="info-row editable sensitive-row" onclick="editField(event, '${safeRefreshToken}', 'projectId', '${safeProjectIdJs}')" title="${t('tooltips.clickToEdit')}">
                     <span class="info-label">📦</span>
-                    <span class="info-value sensitive-info">${safeProjectId || '点击设置'}</span>
+                    <span class="info-value sensitive-info">${safeProjectId || t('tokens.clickToSet')}</span>
                     <span class="info-edit-icon">✏️</span>
                 </div>
-                <div class="info-row editable sensitive-row" onclick="editField(event, '${safeRefreshToken}', 'email', '${safeEmailJs}')" title="点击编辑">
+                <div class="info-row editable sensitive-row" onclick="editField(event, '${safeRefreshToken}', 'email', '${safeEmailJs}')" title="${t('tooltips.clickToEdit')}">
                     <span class="info-label">📧</span>
-                    <span class="info-value sensitive-info">${safeEmail || '点击设置'}</span>
+                    <span class="info-value sensitive-info">${safeEmail || t('tokens.clickToSet')}</span>
                     <span class="info-edit-icon">✏️</span>
                 </div>
                 <div class="info-row ${isExpired ? 'expired-text' : ''}" id="expire-row-${escapeHtml(cardId)}">
                     <span class="info-label">⏰</span>
-                    <span class="info-value">${isRefreshing ? '🔄 刷新中...' : escapeHtml(expireStr)}${isExpired && !isRefreshing ? ' (已过期)' : ''}</span>
-                    <button class="btn-icon btn-refresh" onclick="manualRefreshToken('${safeRefreshToken}')" title="刷新Token" ${isRefreshing ? 'disabled' : ''}>🔄</button>
+                    <span class="info-value">${isRefreshing ? '🔄 ' + t('tokens.refreshing') : escapeHtml(expireStr)}${isExpired && !isRefreshing ? ' (' + t('tokens.expired') + ')' : ''}</span>
+                    <button class="btn-icon btn-refresh" onclick="manualRefreshToken('${safeRefreshToken}')" title="${t('tooltips.refreshToken')}" ${isRefreshing ? 'disabled' : ''}>🔄</button>
                 </div>
             </div>
             <div class="token-quota-inline" id="quota-inline-${escapeHtml(cardId)}">
@@ -154,11 +154,11 @@ function renderTokens(tokens) {
                 <div class="quota-inline-detail hidden" id="quota-detail-${escapeHtml(cardId)}"></div>
             </div>
             <div class="token-actions">
-                <button class="btn btn-info btn-xs" onclick="showQuotaModal('${safeRefreshToken}')" title="查看额度">📊 详情</button>
-                <button class="btn ${token.enable ? 'btn-warning' : 'btn-success'} btn-xs" onclick="toggleToken('${safeRefreshToken}', ${!token.enable})" title="${token.enable ? '禁用' : '启用'}">
-                    ${token.enable ? '⏸️ 禁用' : '▶️ 启用'}
+                <button class="btn btn-info btn-xs" onclick="showQuotaModal('${safeRefreshToken}')" title="${t('tokens.quota')}">📊 ${t('buttons.details')}</button>
+                <button class="btn ${token.enable ? 'btn-warning' : 'btn-success'} btn-xs" onclick="toggleToken('${safeRefreshToken}', ${!token.enable})" title="${token.enable ? t('buttons.disable') : t('buttons.enable')}">
+                    ${token.enable ? '⏸️ ' + t('buttons.disable') : '▶️ ' + t('buttons.enable')}
                 </button>
-                <button class="btn btn-danger btn-xs" onclick="deleteToken('${safeRefreshToken}')" title="删除">🗑️ 删除</button>
+                <button class="btn btn-danger btn-xs" onclick="deleteToken('${safeRefreshToken}')" title="${t('buttons.delete')}">🗑️ ${t('buttons.delete')}</button>
             </div>
         </div>
     `}).join('');
@@ -183,7 +183,7 @@ function renderTokens(tokens) {
 // 手动刷新 Token
 async function manualRefreshToken(refreshToken) {
     if (refreshingTokens.has(refreshToken)) {
-        showToast('该 Token 正在刷新中', 'warning');
+        showToast(t('messages.tokenRefreshing'), 'warning');
         return;
     }
     await autoRefreshToken(refreshToken);
@@ -202,7 +202,7 @@ async function autoRefreshToken(refreshToken) {
     if (card) card.classList.add('refreshing');
     if (expireRow) {
         const valueSpan = expireRow.querySelector('.info-value');
-        if (valueSpan) valueSpan.textContent = '🔄 刷新中...';
+        if (valueSpan) valueSpan.textContent = '🔄 ' + t('tokens.refreshing');
     }
     
     try {
@@ -213,28 +213,25 @@ async function autoRefreshToken(refreshToken) {
         
         const data = await response.json();
         if (data.success) {
-            showToast('Token 已自动刷新', 'success');
-            // 刷新成功后重新加载列表
+            showToast(t('messages.tokenRefreshed'), 'success');
             refreshingTokens.delete(refreshToken);
             loadTokens();
         } else {
-            showToast(`Token 刷新失败: ${data.message || '未知错误'}`, 'error');
+            showToast(t('messages.tokenRefreshFailed') + ': ' + (data.message || t('messages.unknownError')), 'error');
             refreshingTokens.delete(refreshToken);
-            // 更新 UI 显示刷新失败
             if (expireRow) {
                 const valueSpan = expireRow.querySelector('.info-value');
-                if (valueSpan) valueSpan.textContent = '❌ 刷新失败';
+                if (valueSpan) valueSpan.textContent = '❌ ' + t('tokens.refreshFailed');
             }
         }
     } catch (error) {
         if (error.message !== 'Unauthorized') {
-            showToast(`Token 刷新失败: ${error.message}`, 'error');
+            showToast(t('messages.tokenRefreshFailed') + ': ' + error.message, 'error');
         }
         refreshingTokens.delete(refreshToken);
-        // 更新 UI 显示刷新失败
         if (expireRow) {
             const valueSpan = expireRow.querySelector('.info-value');
-            if (valueSpan) valueSpan.textContent = '❌ 刷新失败';
+            if (valueSpan) valueSpan.textContent = '❌ ' + t('tokens.refreshFailed');
         }
     }
 }
@@ -244,16 +241,16 @@ function showManualModal() {
     modal.className = 'modal form-modal';
     modal.innerHTML = `
         <div class="modal-content">
-            <div class="modal-title">✏️ 手动填入Token</div>
+            <div class="modal-title">✏️ ${t('modals.manualAdd')}</div>
             <div class="form-row">
-                <input type="text" id="modalAccessToken" placeholder="Access Token (必填)">
-                <input type="text" id="modalRefreshToken" placeholder="Refresh Token (必填)">
-                <input type="number" id="modalExpiresIn" placeholder="过期时间(秒)" value="3599">
+                <input type="text" id="modalAccessToken" placeholder="${t('modals.accessTokenRequired')}">
+                <input type="text" id="modalRefreshToken" placeholder="${t('modals.refreshTokenRequired')}">
+                <input type="number" id="modalExpiresIn" placeholder="${t('modals.expiresIn')}" value="3599">
             </div>
-            <p style="font-size: 0.8rem; color: var(--text-light); margin-bottom: 12px;">💡 过期时间默认3599秒(约1小时)</p>
+            <p style="font-size: 0.8rem; color: var(--text-light); margin-bottom: 12px;">💡 ${t('modals.expiresInHint')}</p>
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
-                <button class="btn btn-success" onclick="addTokenFromModal()">✅ 添加</button>
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${t('buttons.cancel')}</button>
+                <button class="btn btn-success" onclick="addTokenFromModal()">✅ ${t('buttons.add')}</button>
             </div>
         </div>
     `;
@@ -268,11 +265,11 @@ async function addTokenFromModal() {
     const expiresIn = parseInt(document.getElementById('modalExpiresIn').value);
     
     if (!accessToken || !refreshToken) {
-        showToast('请填写完整的Token信息', 'warning');
+        showToast(t('messages.pleaseInputComplete'), 'warning');
         return;
     }
     
-    showLoading('正在添加Token...');
+    showLoading(t('messages.addingToken'));
     try {
         const response = await authFetch('/admin/tokens', {
             method: 'POST',
@@ -287,14 +284,14 @@ async function addTokenFromModal() {
         hideLoading();
         if (data.success) {
             modal.remove();
-            showToast('Token添加成功', 'success');
+            showToast(t('messages.tokenAdded'), 'success');
             loadTokens();
         } else {
-            showToast(data.message || '添加失败', 'error');
+            showToast(data.message || t('messages.addFailed'), 'error');
         }
     } catch (error) {
         hideLoading();
-        showToast('添加失败: ' + error.message, 'error');
+        showToast(t('messages.addFailed') + ': ' + error.message, 'error');
     }
 }
 
@@ -305,7 +302,7 @@ function editField(event, refreshToken, field, currentValue) {
     
     if (row.querySelector('input')) return;
     
-    const fieldLabels = { projectId: 'Project ID', email: '邮箱' };
+    const fieldLabels = { projectId: 'Project ID', email: t('tokens.email') };
     
     const input = document.createElement('input');
     input.type = field === 'email' ? 'email' : 'text';
@@ -334,14 +331,14 @@ function editField(event, refreshToken, field, currentValue) {
             
             const data = await response.json();
             if (data.success) {
-                showToast('已保存', 'success');
+                showToast(t('messages.saved'), 'success');
                 loadTokens();
             } else {
-                showToast(data.message || '保存失败', 'error');
+                showToast(data.message || t('messages.saveFailed'), 'error');
                 cancel();
             }
         } catch (error) {
-            showToast('保存失败', 'error');
+            showToast(t('messages.saveFailed'), 'error');
             cancel();
         }
     };
@@ -376,7 +373,7 @@ function editField(event, refreshToken, field, currentValue) {
 function showTokenDetail(refreshToken) {
     const token = cachedTokens.find(t => t.refresh_token === refreshToken);
     if (!token) {
-        showToast('Token不存在', 'error');
+        showToast(t('messages.tokenNotExist'), 'error');
         return;
     }
     
@@ -392,30 +389,30 @@ function showTokenDetail(refreshToken) {
     modal.className = 'modal form-modal';
     modal.innerHTML = `
         <div class="modal-content">
-            <div class="modal-title">📝 Token详情</div>
+            <div class="modal-title">📝 ${t('tokens.tokenDetails')}</div>
             <div class="form-group compact">
-                <label>🎫 Access Token (只读)</label>
+                <label>🎫 ${t('tokens.accessTokenReadonly')}</label>
                 <div class="token-display">${safeAccessToken}</div>
             </div>
             <div class="form-group compact">
-                <label>🔄 Refresh Token (只读)</label>
+                <label>🔄 ${t('tokens.refreshTokenReadonly')}</label>
                 <div class="token-display">${safeRefreshToken}</div>
             </div>
             <div class="form-group compact">
-                <label>📦 Project ID</label>
-                <input type="text" id="editProjectId" value="${safeProjectId}" placeholder="项目ID">
+                <label>📦 ${t('tokens.projectId')}</label>
+                <input type="text" id="editProjectId" value="${safeProjectId}" placeholder="Project ID">
             </div>
             <div class="form-group compact">
-                <label>📧 邮箱</label>
-                <input type="email" id="editEmail" value="${safeEmail}" placeholder="账号邮箱">
+                <label>📧 ${t('tokens.email')}</label>
+                <input type="email" id="editEmail" value="${safeEmail}" placeholder="Email">
             </div>
             <div class="form-group compact">
-                <label>⏰ 过期时间</label>
+                <label>⏰ ${t('tokens.expireTime')}</label>
                 <input type="text" value="${expireTimeStr}" readonly style="background: var(--bg); cursor: not-allowed;">
             </div>
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
-                <button class="btn btn-success" onclick="saveTokenDetail('${safeRefreshTokenJs}')">💾 保存</button>
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${t('buttons.cancel')}</button>
+                <button class="btn btn-success" onclick="saveTokenDetail('${safeRefreshTokenJs}')">💾 ${t('buttons.save')}</button>
             </div>
         </div>
     `;
@@ -427,7 +424,7 @@ async function saveTokenDetail(refreshToken) {
     const projectId = document.getElementById('editProjectId').value.trim();
     const email = document.getElementById('editEmail').value.trim();
     
-    showLoading('保存中...');
+    showLoading(t('messages.saving'));
     try {
         const response = await authFetch(`/admin/tokens/${encodeURIComponent(refreshToken)}`, {
             method: 'PUT',
@@ -442,23 +439,23 @@ async function saveTokenDetail(refreshToken) {
         hideLoading();
         if (data.success) {
             document.querySelector('.form-modal').remove();
-            showToast('保存成功', 'success');
+            showToast(t('messages.saveSuccess'), 'success');
             loadTokens();
         } else {
-            showToast(data.message || '保存失败', 'error');
+            showToast(data.message || t('messages.saveFailed'), 'error');
         }
     } catch (error) {
         hideLoading();
-        showToast('保存失败: ' + error.message, 'error');
+        showToast(t('messages.saveFailed') + ': ' + error.message, 'error');
     }
 }
 
 async function toggleToken(refreshToken, enable) {
-    const action = enable ? '启用' : '禁用';
-    const confirmed = await showConfirm(`确定要${action}这个Token吗？`, `${action}确认`);
+    const confirmMsg = enable ? t('modals.enableConfirm') : t('modals.disableConfirm');
+    const confirmed = await showConfirm(confirmMsg, t('modals.confirmOperation'));
     if (!confirmed) return;
     
-    showLoading(`正在${action}...`);
+    showLoading(enable ? t('messages.enabling') : t('messages.disabling'));
     try {
         const response = await authFetch(`/admin/tokens/${encodeURIComponent(refreshToken)}`, {
             method: 'PUT',
@@ -472,23 +469,23 @@ async function toggleToken(refreshToken, enable) {
         const data = await response.json();
         hideLoading();
         if (data.success) {
-            showToast(`已${action}`, 'success');
-            skipAnimation = true; // 跳过动画
+            showToast(enable ? t('messages.enabled') : t('messages.disabled'), 'success');
+            skipAnimation = true;
             loadTokens();
         } else {
-            showToast(data.message || '操作失败', 'error');
+            showToast(data.message || t('messages.operationFailed'), 'error');
         }
     } catch (error) {
         hideLoading();
-        showToast('操作失败: ' + error.message, 'error');
+        showToast(t('messages.operationFailed') + ': ' + error.message, 'error');
     }
 }
 
 async function deleteToken(refreshToken) {
-    const confirmed = await showConfirm('删除后无法恢复，确定删除？', '⚠️ 删除确认');
+    const confirmed = await showConfirm(t('modals.deleteConfirm'), '⚠️ ' + t('modals.confirmOperation'));
     if (!confirmed) return;
     
-    showLoading('正在删除...');
+    showLoading(t('messages.deleting'));
     try {
         const response = await authFetch(`/admin/tokens/${encodeURIComponent(refreshToken)}`, {
             method: 'DELETE',
@@ -498,13 +495,13 @@ async function deleteToken(refreshToken) {
         const data = await response.json();
         hideLoading();
         if (data.success) {
-            showToast('已删除', 'success');
+            showToast(t('messages.deleted'), 'success');
             loadTokens();
         } else {
-            showToast(data.message || '删除失败', 'error');
+            showToast(data.message || t('messages.deleteFailed'), 'error');
         }
     } catch (error) {
         hideLoading();
-        showToast('删除失败: ' + error.message, 'error');
+        showToast(t('messages.deleteFailed') + ': ' + error.message, 'error');
     }
 }

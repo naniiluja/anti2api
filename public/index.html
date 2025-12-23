@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Token 管理</title>
+    <title>Token Management</title>
     <!-- 防止页面闪烁：在渲染前根据登录状态和Tab状态设置初始显示 -->
     <script>
         (function() {
@@ -64,17 +64,17 @@ html.tab-settings .tab[data-tab="settings"] {
     <div class="container">
         <!-- 登录表单 -->
         <div id="loginForm" class="login-form">
-            <h2>Token 管理</h2>
+            <h2 data-i18n="app.title">Token Management</h2>
             <form id="login">
                 <div class="form-group">
-                    <label>👤 用户名</label>
+                    <label>👤 <span data-i18n="app.username">Username</span></label>
                     <input type="text" id="username" required autocomplete="username">
                 </div>
                 <div class="form-group">
-                    <label>🔑 密码</label>
+                    <label>🔑 <span data-i18n="app.password">Password</span></label>
                     <input type="password" id="password" required autocomplete="current-password">
                 </div>
-                <button type="submit">登录</button>
+                <button type="submit" data-i18n="app.login">Login</button>
             </form>
         </div>
 
@@ -82,11 +82,11 @@ html.tab-settings .tab[data-tab="settings"] {
         <div id="mainContent" class="main-content hidden">
             <div class="header">
             <div class="tabs">
-                <button class="tab active" data-tab="tokens" onclick="switchTab('tokens')">🎯 Token</button>
-                <button class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ 设置</button>
+                <button class="tab active" data-tab="tokens" onclick="switchTab('tokens')">🎯 <span data-i18n="tabs.tokens">Token</span></button>
+                <button class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ <span data-i18n="tabs.settings">Settings</span></button>
             </div>
                 <div class="header-right">
-                    <button onclick="logout()">🚪 退出</button>
+                    <button onclick="logout()">🚪 <span data-i18n="app.logout">Logout</span></button>
                 </div>
             </div>
             <div class="content">
@@ -97,22 +97,22 @@ html.tab-settings .tab[data-tab="settings"] {
                         <div class="stats-inline">
                             <div class="stat-item clickable active" onclick="filterTokens('all')">
                                 <span class="stat-num" id="totalTokens">0</span>
-                                <span class="stat-text">总数</span>
+                                <span class="stat-text" data-i18n="stats.total">Total</span>
                             </div>
                             <div class="stat-item success clickable" onclick="filterTokens('enabled')">
                                 <span class="stat-num" id="enabledTokens">0</span>
-                                <span class="stat-text">启用</span>
+                                <span class="stat-text" data-i18n="stats.enabled">Enabled</span>
                             </div>
                             <div class="stat-item danger clickable" onclick="filterTokens('disabled')">
                                 <span class="stat-num" id="disabledTokens">0</span>
-                                <span class="stat-text">禁用</span>
+                                <span class="stat-text" data-i18n="stats.disabled">Disabled</span>
                             </div>
                         </div>
                         <div class="action-btns">
-                            <button type="button" onclick="showOAuthModal()" class="btn btn-success btn-sm">🔐 OAuth</button>
-                            <button type="button" onclick="showManualModal()" class="btn btn-secondary btn-sm">✏️ 手动</button>
-                            <button type="button" onclick="loadTokens()" class="btn btn-warning btn-sm">🔄 刷新</button>
-                            <button type="button" onclick="toggleSensitiveInfo()" class="btn btn-sm" id="toggleSensitiveBtn" title="隐藏/显示敏感信息">👁️ 显示</button>
+                            <button type="button" onclick="showOAuthModal()" class="btn btn-success btn-sm">🔐 <span data-i18n="buttons.oauth">OAuth</span></button>
+                            <button type="button" onclick="showManualModal()" class="btn btn-secondary btn-sm">✏️ <span data-i18n="buttons.manual">Manual</span></button>
+                            <button type="button" onclick="loadTokens()" class="btn btn-warning btn-sm">🔄 <span data-i18n="buttons.refresh">Refresh</span></button>
+                            <button type="button" onclick="toggleSensitiveInfo()" class="btn btn-sm" id="toggleSensitiveBtn" data-i18n-title="tooltips.toggleSensitive">👁️ <span data-i18n="buttons.show">Show</span></button>
                         </div>
                     </div>
 
@@ -120,8 +120,8 @@ html.tab-settings .tab[data-tab="settings"] {
                     <div id="tokenList" class="token-grid">
                         <div class="empty-state">
                             <div class="empty-state-icon">📦</div>
-                            <div class="empty-state-text">暂无Token</div>
-                            <div class="empty-state-hint">点击上方OAuth按钮添加Token</div>
+                            <div class="empty-state-text" data-i18n="tokens.noTokens">No Tokens</div>
+                            <div class="empty-state-hint" data-i18n="tokens.clickOAuthHint">Click OAuth button above to add Token</div>
                         </div>
                     </div>
                 </div>
@@ -132,37 +132,37 @@ html.tab-settings .tab[data-tab="settings"] {
                         <div class="config-grid">
                             <!-- 服务器配置 -->
                             <div class="config-section">
-                                <h4>🖥️ 服务器</h4>
+                                <h4>🖥️ <span data-i18n="settings.server">Server</span></h4>
                                 <div class="form-row-inline">
                                     <div class="form-group compact">
-                                        <label>端口</label>
+                                        <label data-i18n="settings.port">Port</label>
                                         <input type="number" name="PORT" placeholder="8045">
                                     </div>
                                     <div class="form-group compact">
-                                        <label>监听地址</label>
+                                        <label data-i18n="settings.host">Listen Address</label>
                                         <input type="text" name="HOST" placeholder="0.0.0.0">
                                     </div>
                                 </div>
                                 <div class="form-row-inline">
                                     <div class="form-group compact">
-                                        <label>最大请求大小</label>
+                                        <label data-i18n="settings.maxRequestSize">Max Request Size</label>
                                         <input type="text" name="MAX_REQUEST_SIZE" placeholder="500mb">
                                     </div>
                                     <div class="form-group compact">
-                                        <label>API密钥</label>
-                                        <input type="password" name="API_KEY" placeholder="留空则不验证">
+                                        <label data-i18n="settings.apiKey">API Key</label>
+                                        <input type="password" name="API_KEY" placeholder="">
                                     </div>
                                 </div>
                                 <div class="form-row-inline switch-row">
                                     <div class="form-group compact switch-group">
-                                        <label>跳过验证 <span class="help-tip" data-tooltip="跳过ProjectId获取，直接随机生成（仅Pro账号）">?</span></label>
+                                        <label><span data-i18n="settings.skipValidation">Skip Validation</span> <span class="help-tip" data-i18n-tooltip="tooltips.skipProjectId">?</span></label>
                                         <label class="switch">
                                             <input type="checkbox" name="SKIP_PROJECT_ID_FETCH">
                                             <span class="slider"></span>
                                         </label>
                                     </div>
                                     <div class="form-group compact switch-group">
-                                        <label>原生Axios <span class="help-tip" data-tooltip="使用原生axios而非TLS指纹请求器">?</span></label>
+                                        <label><span data-i18n="settings.nativeAxios">Native Axios</span> <span class="help-tip" data-i18n-tooltip="tooltips.nativeAxios">?</span></label>
                                         <label class="switch">
                                             <input type="checkbox" name="USE_NATIVE_AXIOS">
                                             <span class="slider"></span>
@@ -170,21 +170,21 @@ html.tab-settings .tab[data-tab="settings"] {
                                     </div>
                                 </div>
                                 <div class="form-group compact">
-                                    <label>图片访问链接</label>
+                                    <label data-i18n="settings.imageUrl">Image URL</label>
                                     <input type="text" name="IMAGE_BASE_URL" placeholder="https://your-domain.zeabur.app">
                                 </div>
                                 <div class="form-group compact">
-                                    <label>代理地址</label>
+                                    <label data-i18n="settings.proxy">Proxy</label>
                                     <input type="text" name="PROXY" placeholder="http://127.0.0.1:7890">
                                 </div>
                             </div>
 
                             <!-- 模型默认参数 -->
                             <div class="config-section">
-                                <h4>🎛️ 模型参数</h4>
+                                <h4>🎛️ <span data-i18n="settings.params">Model Parameters</span></h4>
                                 <div class="form-row-inline">
                                     <div class="form-group compact">
-                                        <label>温度</label>
+                                        <label data-i18n="settings.temperature">Temperature</label>
                                         <input type="number" step="0.1" name="DEFAULT_TEMPERATURE" placeholder="1">
                                     </div>
                                     <div class="form-group compact">
@@ -198,17 +198,17 @@ html.tab-settings .tab[data-tab="settings"] {
                                         <input type="number" name="DEFAULT_TOP_K" placeholder="50">
                                     </div>
                                     <div class="form-group compact">
-                                        <label>最大Token</label>
+                                        <label data-i18n="settings.maxTokens">Max Tokens</label>
                                         <input type="number" name="DEFAULT_MAX_TOKENS" placeholder="32000">
                                     </div>
                                 </div>
                                 <div class="form-group compact highlight">
-                                    <label>思考预算 <span class="help-tip" data-tooltip="思考模型的思考token预算，影响推理深度">?</span></label>
+                                    <label><span data-i18n="settings.thinkingBudget">Thinking Budget</span> <span class="help-tip" data-i18n-tooltip="tooltips.thinkingBudget">?</span></label>
                                     <input type="number" name="DEFAULT_THINKING_BUDGET" placeholder="16000">
                                 </div>
                                 <div class="form-row-inline switch-row">
                                     <div class="form-group compact switch-group">
-                                        <label>上下文System <span class="help-tip" data-tooltip="合并开头连续的system消息到SystemInstruction">?</span></label>
+                                        <label><span data-i18n="settings.contextSystem">Context System</span> <span class="help-tip" data-i18n-tooltip="tooltips.contextSystem">?</span></label>
                                         <label class="switch">
                                             <input type="checkbox" name="USE_CONTEXT_SYSTEM_PROMPT">
                                             <span class="slider"></span>
@@ -216,17 +216,17 @@ html.tab-settings .tab[data-tab="settings"] {
                                     </div>
                                 </div>
                                 <div class="form-group compact">
-                                    <label>系统提示词</label>
-                                    <textarea name="SYSTEM_INSTRUCTION" rows="3" placeholder="可选的系统提示词"></textarea>
+                                    <label data-i18n="settings.systemPrompt">System Prompt</label>
+                                    <textarea name="SYSTEM_INSTRUCTION" rows="3" data-i18n-placeholder="settings.systemPromptPlaceholder"></textarea>
                                 </div>
                             </div>
 
                             <!-- 轮询策略与性能优化 -->
                             <div class="config-section">
-                                <h4>🔄 轮询与性能</h4>
+                                <h4>🔄 <span data-i18n="settings.rotation">Rotation & Performance</span></h4>
                                 <div class="form-row-inline switch-row">
                                     <div class="form-group compact switch-group">
-                                        <label>透传签名 <span class="help-tip" data-tooltip="将响应中的thoughtSignature透传到客户端">?</span></label>
+                                        <label><span data-i18n="settings.passSignature">Pass Signature</span> <span class="help-tip" data-i18n-tooltip="tooltips.passSignature">?</span></label>
                                         <label class="switch">
                                             <input type="checkbox" name="PASS_SIGNATURE_TO_CLIENT">
                                             <span class="slider"></span>
@@ -235,45 +235,45 @@ html.tab-settings .tab[data-tab="settings"] {
                                 </div>
                                 <div class="form-row-inline">
                                     <div class="form-group compact">
-                                        <label>策略模式 <span class="help-tip" data-tooltip="均衡负载：每次请求切换Token&#10;额度耗尽：用完额度才切换&#10;自定义次数：指定次数后切换">?</span></label>
+                                        <label><span data-i18n="settings.strategy">Strategy</span> <span class="help-tip" data-i18n-tooltip="tooltips.strategy">?</span></label>
                                         <select name="ROTATION_STRATEGY" id="rotationStrategy" onchange="toggleRequestCountInput()">
-                                            <option value="round_robin">均衡负载</option>
-                                            <option value="quota_exhausted">额度耗尽切换</option>
-                                            <option value="request_count">自定义次数</option>
+                                            <option value="round_robin" data-i18n="settings.roundRobin">Round Robin</option>
+                                            <option value="quota_exhausted" data-i18n="settings.quotaExhausted">Quota Exhausted</option>
+                                            <option value="request_count" data-i18n="settings.requestCount">Request Count</option>
                                         </select>
                                     </div>
                                     <div class="form-group compact" id="requestCountGroup">
-                                        <label>每Token请求次数 <span class="help-tip" data-tooltip="自定义次数模式下，每个Token处理多少次请求后切换">?</span></label>
+                                        <label><span data-i18n="settings.requestsPerToken">Requests Per Token</span> <span class="help-tip" data-i18n-tooltip="tooltips.requestsPerToken">?</span></label>
                                         <input type="number" name="ROTATION_REQUEST_COUNT" min="1" placeholder="10">
                                     </div>
                                 </div>
                                 <div class="rotation-status" id="rotationStatus">
-                                    <span class="rotation-label">当前状态:</span>
-                                    <span id="currentRotationInfo">加载中...</span>
+                                    <span class="rotation-label" data-i18n="settings.currentStatus">Current Status:</span>
+                                    <span id="currentRotationInfo" data-i18n="settings.loading">Loading...</span>
                                 </div>
                                 <div class="form-row-inline">
                                     <div class="form-group compact">
-                                        <label>超时(ms)</label>
+                                        <label data-i18n="settings.timeout">Timeout (ms)</label>
                                         <input type="number" name="TIMEOUT" placeholder="300000">
                                     </div>
                                     <div class="form-group compact">
-                                        <label>429重试次数</label>
+                                        <label data-i18n="settings.retryTimes">429 Retry Times</label>
                                         <input type="number" name="RETRY_TIMES" placeholder="0">
                                     </div>
                                 </div>
 
                                 <div class="form-row-inline">
                                     <div class="form-group compact">
-                                        <label>心跳间隔(ms) <span class="help-tip" data-tooltip="SSE心跳间隔，防止CF超时断连">?</span></label>
+                                        <label><span data-i18n="settings.heartbeat">Heartbeat (ms)</span> <span class="help-tip" data-i18n-tooltip="tooltips.heartbeat">?</span></label>
                                         <input type="number" name="HEARTBEAT_INTERVAL" placeholder="15000">
                                     </div>
                                     <div class="form-group compact">
-                                        <label>内存阈值(MB) <span class="help-tip" data-tooltip="超过此值触发GC清理">?</span></label>
+                                        <label><span data-i18n="settings.memoryThreshold">Memory (MB)</span> <span class="help-tip" data-i18n-tooltip="tooltips.memoryThreshold">?</span></label>
                                         <input type="number" name="MEMORY_THRESHOLD" placeholder="100">
                                     </div>
                                 </div>
                                 <div class="form-group compact">
-                                    <label>🔤 界面字体大小 (px)</label>
+                                    <label>🔤 <span data-i18n="settings.fontSize">Font Size (px)</span></label>
                                     <div class="font-size-control">
                                         <input type="range" id="fontSizeRange" min="10" max="24" value="18" oninput="changeFontSize(this.value)">
                                         <input type="number" id="fontSizeInput" min="10" max="24" value="18" onchange="changeFontSize(this.value)" style="width: 60px;">
@@ -282,8 +282,8 @@ html.tab-settings .tab[data-tab="settings"] {
                             </div>
                         </div>
                         <div class="config-actions">
-                            <button type="submit" class="btn btn-success">💾 保存配置</button>
-                            <button type="button" onclick="loadConfig()" class="btn btn-secondary">🔄 重新加载</button>
+                            <button type="submit" class="btn btn-success">💾 <span data-i18n="buttons.save">Save Config</span></button>
+                            <button type="button" onclick="loadConfig()" class="btn btn-secondary">🔄 <span data-i18n="buttons.reload">Reload</span></button>
                         </div>
                     </form>
                 </div>
@@ -291,6 +291,8 @@ html.tab-settings .tab[data-tab="settings"] {
         </div>
     </div>
 
+    <!-- i18n module - load first -->
+    <script src="js/i18n.js" defer></script>
     <!-- 按依赖顺序加载模块 -->
     <script src="js/utils.js" defer></script>
     <script src="js/ui.js" defer></script>

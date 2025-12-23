@@ -1,4 +1,4 @@
-// 配置管理：加载、保存
+// Config Management: load, save
 
 function toggleRequestCountInput() {
     const strategy = document.getElementById('rotationStrategy').value;
@@ -17,22 +17,22 @@ async function loadRotationStatus() {
         if (data.success) {
             const { strategy, requestCount, currentIndex } = data.data;
             const strategyNames = {
-                'round_robin': '均衡负载',
-                'quota_exhausted': '额度耗尽切换',
-                'request_count': '自定义次数'
+                'round_robin': t('settings.roundRobin'),
+                'quota_exhausted': t('settings.quotaExhausted'),
+                'request_count': t('settings.requestCount')
             };
             const statusEl = document.getElementById('currentRotationInfo');
             if (statusEl) {
                 let statusText = `${strategyNames[strategy] || strategy}`;
                 if (strategy === 'request_count') {
-                    statusText += ` (每${requestCount}次)`;
+                    statusText += ` (${t('settings.perRequests', {count: requestCount})})`;
                 }
-                statusText += ` | 当前索引: ${currentIndex}`;
+                statusText += ` | ${t('settings.currentIndex')}: ${currentIndex}`;
                 statusEl.textContent = statusText;
             }
         }
     } catch (error) {
-        console.error('加载轮询状态失败:', error);
+        console.error('loadRotationStatus failed:', error);
     }
 }
 
@@ -86,7 +86,7 @@ async function loadConfig() {
             loadRotationStatus();
         }
     } catch (error) {
-        showToast('加载配置失败: ' + error.message, 'error');
+        showToast(t('settings.loadConfigFailed') + ': ' + error.message, 'error');
     }
 }
 
@@ -154,7 +154,7 @@ async function saveConfig(e) {
         }
     });
     
-    showLoading('正在保存配置...');
+    showLoading(t('settings.savingConfig'));
     try {
         const response = await authFetch('/admin/config', {
             method: 'PUT',
@@ -180,13 +180,13 @@ async function saveConfig(e) {
         
         hideLoading();
         if (data.success) {
-            showToast('配置已保存', 'success');
+            showToast(t('settings.configSaved'), 'success');
             loadConfig();
         } else {
-            showToast(data.message || '保存失败', 'error');
+            showToast(data.message || t('messages.saveFailed'), 'error');
         }
     } catch (error) {
         hideLoading();
-        showToast('保存失败: ' + error.message, 'error');
+        showToast(t('messages.saveFailed') + ': ' + error.message, 'error');
     }
 }
