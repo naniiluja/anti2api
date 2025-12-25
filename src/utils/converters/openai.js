@@ -33,7 +33,7 @@ function extractImagesFromContent(content) {
         if (match) {
           result.images.push({
             inlineData: {
-              mimeType: `image/${match[1]}`,
+              mimeType: `image/${match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase()}`,
               data: match[2]
             }
           });

@@ -17,6 +17,26 @@ const ChatSessionHistory = ({
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    // Get text preview from content (handles string, array, object formats)
+    const getContentPreview = (content, maxLen = 50) => {
+        if (!content) return 'Empty';
+        if (typeof content === 'string') {
+            return content.slice(0, maxLen) + (content.length > maxLen ? '...' : '');
+        }
+        if (Array.isArray(content)) {
+            const textItem = content.find(item => item && item.type === 'text');
+            const text = textItem?.text || '';
+            const hasImage = content.some(item => item && item.type === 'image_url');
+            const prefix = hasImage ? '🖼️ ' : '';
+            return prefix + (text.slice(0, maxLen) + (text.length > maxLen ? '...' : '') || (hasImage ? 'Image' : 'Empty'));
+        }
+        if (typeof content === 'object' && content.type === 'text') {
+            const text = content.text || '';
+            return text.slice(0, maxLen) + (text.length > maxLen ? '...' : '');
+        }
+        return 'Empty';
+    };
+
     return (
         <div className={`chat-sidebar ${isVisible ? 'visible' : ''}`}>
             <div className="sidebar-header">
@@ -51,8 +71,7 @@ const ChatSessionHistory = ({
                                 <span className="session-name">{session.name}</span>
                                 <span className="session-date">{formatDate(session.updatedAt)}</span>
                                 <span className="session-preview">
-                                    {session.messages?.[0]?.content?.slice(0, 50) || 'Empty'}
-                                    {session.messages?.[0]?.content?.length > 50 ? '...' : ''}
+                                    {getContentPreview(session.messages?.[0]?.content)}
                                 </span>
                             </div>
                             <button

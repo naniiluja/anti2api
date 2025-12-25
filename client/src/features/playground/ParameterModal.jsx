@@ -96,6 +96,19 @@ const ParameterModal = ({ isOpen, onClose, params, onSave }) => {
                         </select>
                         <p className="param-hint">{t('playground.reasoningHint') || 'Enable chain-of-thought reasoning'}</p>
                     </div>
+
+                    {/* Prompt Caching */}
+                    <div className="param-group">
+                        <label className="checkbox-label">
+                            <input
+                                type="checkbox"
+                                checked={localParams.prompt_caching || false}
+                                onChange={(e) => handleChange('prompt_caching', e.target.checked)}
+                            />
+                            <span>{t('playground.promptCaching') || 'Prompt Caching'}</span>
+                        </label>
+                        <p className="param-hint">{t('playground.promptCachingHint') || 'Cache conversation context for faster responses (Claude models)'}</p>
+                    </div>
                 </div>
 
                 <div className="modal-footer">

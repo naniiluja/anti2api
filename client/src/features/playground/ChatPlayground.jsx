@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../../context/I18nContext';
-import { VscSettingsGear, VscAdd, VscTrash, VscSend } from 'react-icons/vsc';
+import { VscSettingsGear, VscAdd, VscTrash, VscSend, VscClose } from 'react-icons/vsc';
 import ChatMessage from './ChatMessage';
 import ChatSessionHistory from './ChatSessionHistory';
 import ParameterModal from './ParameterModal';
@@ -33,7 +33,104 @@ const ChatPlayground = () => {
     const [showParams, setShowParams] = useState(false);
     const [params, setParams] = useState(DEFAULT_PARAMS);
     const [showSidebar, setShowSidebar] = useState(true);
+    const [selectedImages, setSelectedImages] = useState([]);
     const messagesEndRef = useRef(null);
+    const fileInputRef = useRef(null);
+
+    // Detect actual MIME type from base64 data
+    const detectMimeType = (base64) => {
+        const signatures = {
+            '/9j/': 'image/jpeg',
+            'iVBORw0KGgo': 'image/png',
+            'R0lGOD': 'image/gif',
+            'UklGR': 'image/webp',
+            'Qk0': 'image/bmp'
+        };
+        for (const [sig, mime] of Object.entries(signatures)) {
+            if (base64.startsWith(sig)) return mime;
+        }
+        return null;
+    };
+
+    // Convert file to base64 with correct MIME type
+    const fileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                const result = reader.result;
+                // Extract the base64 part and detect actual MIME type
+                const base64Match = result.match(/^data:([^;]+);base64,(.+)$/);
+                if (base64Match) {
+                    const base64Data = base64Match[2];
+                    const detectedMime = detectMimeType(base64Data);
+                    if (detectedMime && detectedMime !== base64Match[1]) {
+                        // Rebuild with correct MIME type
+                        resolve(`data:${detectedMime};base64,${base64Data}`);
+                    } else {
+                        resolve(result);
+                    }
+                } else {
+                    resolve(result);
+                }
+            };
+            reader.onerror = (error) => reject(error);
+        });
+    };
+
+    // Handle image selection
+    const handleImageSelect = async (e) => {
+        const files = Array.from(e.target.files);
+        const maxFiles = 3;
+        const maxSize = 5 * 1024 * 1024; // 5MB
+
+        const validFiles = files.filter(file => {
+            if (file.size > maxSize) {
+                console.warn(`File ${file.name} is too large (max 5MB)`);
+                return false;
+            }
+            return true;
+        }).slice(0, maxFiles - selectedImages.length);
+
+        const newImages = await Promise.all(
+            validFiles.map(async (file) => ({
+                file,
+                preview: URL.createObjectURL(file),
+                base64: await fileToBase64(file)
+            }))
+        );
+
+        setSelectedImages(prev => [...prev, ...newImages].slice(0, maxFiles));
+        e.target.value = ''; // Reset input
+    };
+
+    // Remove image from selection
+    const handleRemoveImage = (index) => {
+        setSelectedImages(prev => {
+            const newImages = [...prev];
+            URL.revokeObjectURL(newImages[index].preview);
+            newImages.splice(index, 1);
+            return newImages;
+        });
+    };
+
+    // Build message content with images
+    const buildMessageContent = (text, images) => {
+        if (images.length === 0) {
+            return text;
+        }
+        const content = [];
+        if (text.trim()) {
+            content.push({ type: 'text', text: text.trim() });
+        }
+        images.forEach(img => {
+            content.push({
+                type: 'image_url',
+                image_url: { url: img.base64 }
+            });
+        });
+        return content;
+    };
 
     // Load models on mount
     useEffect(() => {
@@ -105,7 +202,7 @@ const ChatPlayground = () => {
     };
 
     const handleSend = async () => {
-        if (!inputValue.trim() || isStreaming) return;
+        if ((!inputValue.trim() && selectedImages.length === 0) || isStreaming) return;
 
         // Auto-create session if none exists
         let activeSessionId = currentSessionId;
@@ -116,10 +213,15 @@ const ChatPlayground = () => {
             activeSessionId = newSession.id;
         }
 
+        const messageContent = buildMessageContent(inputValue, selectedImages);
         const userMessage = {
             role: 'user',
-            content: inputValue.trim()
+            content: messageContent
         };
+
+        // Clear selected images
+        selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+        setSelectedImages([]);
 
         const newMessages = [...messages, userMessage];
         setMessages(newMessages);
@@ -144,7 +246,8 @@ const ChatPlayground = () => {
                 temperature: params.temperature,
                 max_tokens: params.max_tokens,
                 top_p: params.top_p,
-                ...(params.reasoning_effort !== 'none' && { reasoning_effort: params.reasoning_effort })
+                ...(params.reasoning_effort !== 'none' && { reasoning_effort: params.reasoning_effort }),
+                ...(params.prompt_caching && { prompt_caching: true })
             },
             (chunk) => {
                 const delta = chunk.choices?.[0]?.delta;
@@ -210,6 +313,8 @@ const ChatPlayground = () => {
         }
     };
 
+    const canSend = (inputValue.trim() || selectedImages.length > 0) && !isStreaming;
+
     return (
         <div className="chat-playground">
             {/* Sidebar toggle for mobile */}
@@ -274,22 +379,66 @@ const ChatPlayground = () => {
 
                 {/* Input Area */}
                 <div className="chat-input-area">
-                    <textarea
-                        className="chat-input"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={t('playground.typeMessage') || 'Type a message...'}
-                        disabled={isStreaming}
-                        rows={1}
+                    {/* Hidden file input */}
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImageSelect}
+                        accept="image/*"
+                        multiple
+                        style={{ display: 'none' }}
                     />
-                    <button
-                        className="send-btn btn-primary"
-                        onClick={handleSend}
-                        disabled={!inputValue.trim() || isStreaming}
-                    >
-                        <VscSend size={18} />
-                    </button>
+
+                    {/* Image preview */}
+                    {selectedImages.length > 0 && (
+                        <div className="selected-images-preview">
+                            {selectedImages.map((img, index) => (
+                                <div key={index} className="image-thumbnail">
+                                    <img src={img.preview} alt={`Selected ${index + 1}`} />
+                                    <button
+                                        className="remove-image-btn"
+                                        onClick={() => handleRemoveImage(index)}
+                                        title="Remove"
+                                    >
+                                        <VscClose size={12} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="input-row">
+                        {/* Upload button */}
+                        <button
+                            className="btn-icon image-upload-btn"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isStreaming || selectedImages.length >= 3}
+                            title={t('playground.uploadImage') || 'Upload image'}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21,15 16,10 5,21" />
+                            </svg>
+                        </button>
+
+                        <textarea
+                            className="chat-input"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder={t('playground.typeMessage') || 'Type a message...'}
+                            disabled={isStreaming}
+                            rows={1}
+                        />
+                        <button
+                            className="send-btn btn-primary"
+                            onClick={handleSend}
+                            disabled={!canSend}
+                        >
+                            <VscSend size={18} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
