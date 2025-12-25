@@ -4,6 +4,7 @@ A proxy service that converts Google Antigravity API to OpenAI-compatible format
 
 ## Features
 
+### API Features
 - ✅ OpenAI API compatible format
 - ✅ Streaming and non-streaming responses
 - ✅ Tool calling (Function Calling) support
@@ -16,19 +17,27 @@ A proxy service that converts Google Antigravity API to OpenAI-compatible format
 - ✅ Pro account random ProjectId support
 - ✅ Model quota viewing (real-time remaining quota and reset time)
 - ✅ SD WebUI API compatible (txt2img/img2img support)
+- ✅ Multi API format support (OpenAI, Gemini, Claude formats)
+
+### Performance & Optimization
 - ✅ Heartbeat mechanism (prevents Cloudflare timeout)
 - ✅ Model list caching (reduces API requests)
-- ✅ Auto fallback for eligibility check (auto-generates random ProjectId when ineligible)
-- ✅ True System message merging (consecutive system messages at start merge with SystemInstruction)
-- ✅ Privacy mode (auto-hide sensitive information)
 - ✅ Memory optimization (reduced from 8+ to 2 processes, memory from 100MB+ to 50MB+)
 - ✅ Object pool reuse (50%+ reduction in temp object creation, lower GC frequency)
-- ✅ Signature passthrough control (configurable thoughtSignature passthrough to client)
-- ✅ Pre-compiled binaries (Windows/Linux/Android support, no Node.js required)
-- ✅ Multi API format support (OpenAI, Gemini, Claude formats)
-- ✅ Converter code reuse (common modules extracted, reduced duplicate code)
 - ✅ Dynamic memory threshold (auto-calculated based on user config)
-- ✅ **i18n Support (Vietnamese/English)** - Dynamic language switching
+- ✅ Pre-compiled binaries (Windows/Linux/macOS support, no Node.js required)
+
+### Web Management Interface (React SPA)
+- ✅ **Modern React + Vite Client** - Single Page Application with hot reload
+- ✅ **Beautiful Login Page** - Dynamic animated background with SpotlightCard effects
+- ✅ **Token Management** - Add, enable/disable, delete tokens with real-time updates
+- ✅ **AI Playground** - Test Chat and Image Generation models directly in browser
+- ✅ **Request History** - View and track all API requests with detailed logs
+- ✅ **Settings Management** - Configure server settings, rotation strategies, and defaults
+- ✅ **Auto Token Redirect** - Automatically redirect to login when token expires
+- ✅ **i18n Support** - Vietnamese (🇻🇳) and English (🇺🇸) with dynamic switching
+- ✅ **Privacy Mode** - Auto-hide sensitive information (tokens, project IDs)
+- ✅ **Responsive Design** - Works on desktop and mobile devices
 
 ## Requirements
 
@@ -489,68 +498,100 @@ See `.env.example` for complete config example.
 ## Development Commands
 
 ```bash
-# Start service
+# Start production service (backend only)
 npm start
 
-# Development mode (auto-restart)
+# Development mode (backend + frontend with hot reload)
 npm run dev
 
-# Login to get Token
+# Development mode (backend only with watch)
+npm run dev:backend
+
+# Development mode (frontend only)
+npm run dev:client
+
+# Login to get Token via OAuth
 npm run login
+
+# Build binaries for different platforms
+npm run build:win        # Windows x64
+npm run build:linux      # Linux x64
+npm run build:linux-arm64 # Linux ARM64
+npm run build:macos      # macOS x64
+npm run build:macos-arm64 # macOS ARM64
+npm run build:all        # All platforms
 ```
 
 ## Project Structure
 
 ```
 .
+├── client/                     # React SPA Frontend (Vite)
+│   ├── src/
+│   │   ├── api/               # API client configuration
+│   │   │   └── axiosClient.js # Axios instance with interceptors
+│   │   ├── components/        # Reusable UI components
+│   │   │   ├── common/        # Common components (ShinyText, etc.)
+│   │   │   ├── layout/        # Layout components (MainLayout, Sidebar)
+│   │   │   └── ui/            # UI components (SpotlightCard, Squares)
+│   │   ├── context/           # React Context providers
+│   │   │   ├── AuthContext.jsx    # Authentication state
+│   │   │   └── LanguageContext.jsx # i18n language state
+│   │   ├── features/          # Feature modules
+│   │   │   ├── auth/          # Login page with animated background
+│   │   │   ├── history/       # Request history tracking
+│   │   │   ├── playground/    # AI Chat & Image Generation testing
+│   │   │   ├── settings/      # Server configuration
+│   │   │   └── tokens/        # Token management (add, edit, quota)
+│   │   ├── hooks/             # Custom React hooks
+│   │   ├── routes/            # React Router configuration
+│   │   ├── App.jsx            # Main application component
+│   │   └── main.jsx           # Application entry point
+│   ├── public/
+│   │   └── locales/           # i18n translation files (vi.json, en.json)
+│   ├── index.html             # HTML template
+│   ├── vite.config.js         # Vite configuration
+│   └── package.json           # Frontend dependencies
 ├── data/
-│   ├── accounts.json       # Token storage (auto-generated)
-│   └── quotas.json         # Quota cache (auto-generated)
-├── public/
-│   ├── index.html          # Web management interface
-│   ├── style.css           # Interface styles
-│   ├── locales/            # i18n translation files
-│   │   ├── vi.json         # Vietnamese
-│   │   └── en.json         # English
-│   └── js/
-│       ├── i18n.js         # i18n module
-│       ├── auth.js         # Authentication
-│       ├── config.js       # Config management
-│       ├── main.js         # Main entry
-│       ├── quota.js        # Quota management
-│       ├── tokens.js       # Token management
-│       ├── ui.js           # UI components
-│       └── utils.js        # Utilities
-├── src/
+│   ├── accounts.json          # Token storage (auto-generated)
+│   └── quotas.json            # Quota cache (auto-generated)
+├── public/                    # Static files (legacy, served by Express)
+│   └── images/                # Generated images storage
+├── src/                       # Node.js Backend
 │   ├── api/
-│   │   ├── client.js       # API call logic (with model list cache)
-│   │   └── stream_parser.js # Stream response parser (object pool optimized)
+│   │   ├── client.js          # API call logic (with model list cache)
+│   │   └── stream_parser.js   # Stream response parser (object pool optimized)
 │   ├── auth/
-│   │   ├── jwt.js          # JWT authentication
-│   │   ├── token_manager.js # Token management (with rotation strategy)
-│   │   ├── token_store.js  # Token file storage (async read/write)
-│   │   └── quota_manager.js # Quota cache management
+│   │   ├── jwt.js             # JWT authentication
+│   │   ├── token_manager.js   # Token management (with rotation strategy)
+│   │   ├── token_store.js     # Token file storage (async read/write)
+│   │   └── quota_manager.js   # Quota cache management
 │   ├── routes/
-│   │   ├── admin.js        # Admin interface routes
-│   │   └── sd.js           # SD WebUI compatible interface
+│   │   ├── admin.js           # Admin interface routes
+│   │   └── sd.js              # SD WebUI compatible interface
 │   ├── config/
-│   │   ├── config.js       # Config loader
-│   │   └── init-env.js     # Environment variable init
+│   │   ├── config.js          # Config loader
+│   │   └── init-env.js        # Environment variable init
 │   ├── server/
-│   │   └── index.js        # Main server (with memory management and heartbeat)
+│   │   └── index.js           # Main server (with memory management and heartbeat)
 │   └── utils/
-│       ├── converters/     # Format converters
-│       │   ├── common.js   # Common functions
-│       │   ├── openai.js   # OpenAI format
-│       │   ├── claude.js   # Claude format
-│       │   └── gemini.js   # Gemini format
-│       └── ...             # Other utilities
-├── .env                    # Environment variables (sensitive info)
-├── .env.example            # Environment variables example
-├── config.json             # Base config file
-├── Dockerfile              # Docker build file
-├── docker-compose.yml      # Docker Compose config
-└── package.json            # Project config
+│       ├── converters/        # Format converters
+│       │   ├── common.js      # Common functions
+│       │   ├── openai.js      # OpenAI format
+│       │   ├── claude.js      # Claude format
+│       │   └── gemini.js      # Gemini format
+│       └── ...                # Other utilities
+├── scripts/                   # Build and utility scripts
+│   ├── build.js               # Binary build script
+│   ├── oauth-server.js        # OAuth login helper
+│   └── refresh-tokens.js      # Token refresh utility
+├── .env                       # Environment variables (sensitive info)
+├── .env.example               # Environment variables example
+├── config.json                # Base config file
+├── Dockerfile                 # Docker build file (full build)
+├── Dockerfile.binary          # Docker build file (binary deployment)
+├── docker-compose.yml         # Docker Compose config
+└── package.json               # Backend dependencies & scripts
 ```
 
 ## Multi API Format Support
