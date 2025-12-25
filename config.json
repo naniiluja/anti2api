@@ -1,13 +1,13 @@
 {
   "server": {
-    "port": 8045,
+    "port": 8046,
     "host": "0.0.0.0",
     "maxRequestSize": "500mb",
     "heartbeatInterval": 15000,
     "memoryThreshold": 50
   },
   "rotation": {
-    "strategy": "request_count",
+    "strategy": "quota_exhausted",
     "requestCount": 50
   },
   "api": {

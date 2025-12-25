@@ -10,7 +10,9 @@
     "start:no-gc": "node src/server/index.js",
     "login": "node scripts/oauth-server.js",
     "refresh": "node scripts/refresh-tokens.js",
-    "dev": "node --expose-gc --watch src/server/index.js",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:client\"",
+    "dev:backend": "node --expose-gc --watch src/server/index.js",
+    "dev:client": "cd client && npx pnpm run dev",
     "build": "node scripts/build.js --target=win",
     "build:win": "node scripts/build.js --target=win",
     "build:linux": "node scripts/build.js --target=linux",
@@ -35,6 +37,7 @@
     "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "esbuild": "^0.27.2",
     "pkg": "^5.8.1"
   },

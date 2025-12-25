@@ -9,6 +9,7 @@ import { buildOpenAIErrorPayload } from '../../utils/errors.js';
 import logger from '../../utils/logger.js';
 import config from '../../config/config.js';
 import tokenManager from '../../auth/token_manager.js';
+import requestLogger from '../../utils/requestLogger.js';
 import {
   createResponseMeta,
   setStreamHeaders,
@@ -48,6 +49,9 @@ export const createStreamChunk = (id, created, model, delta, finish_reason = nul
  */
 export const handleOpenAIRequest = async (req, res) => {
   const { messages, model, stream = false, tools, ...params } = req.body;
+  const startTime = Date.now();
+  let tokenId = null;
+  let usageData = null;
   
   try {
     if (!messages) {
@@ -58,6 +62,7 @@ export const handleOpenAIRequest = async (req, res) => {
     if (!token) {
       throw new Error('没有可用的token，请运行 npm run login 获取token');
     }
+    tokenId = token.refresh_token?.substring(0, 8) || 'unknown';
     
     const isImageModel = model.includes('-image');
     const requestBody = generateRequestBody(messages, model, params, tools, token);
@@ -83,11 +88,11 @@ export const handleOpenAIRequest = async (req, res) => {
             safeRetries,
             'chat.stream.image '
           );
+          usageData = usage;
           writeStreamData(res, createStreamChunk(id, created, model, { content }));
           writeStreamData(res, { ...createStreamChunk(id, created, model, {}, 'stop'), usage });
         } else {
           let hasToolCall = false;
-          let usageData = null;
 
           await with429Retry(
             () => generateAssistantResponse(requestBody, token, (data) => {
@@ -126,6 +131,18 @@ export const handleOpenAIRequest = async (req, res) => {
 
         clearInterval(heartbeatTimer);
         endStream(res);
+        
+        // Log success
+        requestLogger.logRequest({
+          model,
+          tokenId,
+          status: 'success',
+          statusCode: 200,
+          duration: Date.now() - startTime,
+          inputTokens: usageData?.prompt_tokens || 0,
+          outputTokens: usageData?.completion_tokens || 0,
+          isStream: true
+        });
       } catch (error) {
         clearInterval(heartbeatTimer);
         throw error;
@@ -140,6 +157,7 @@ export const handleOpenAIRequest = async (req, res) => {
         safeRetries,
         'chat.no_stream '
       );
+      usageData = usage;
       
       // DeepSeek 格式：reasoning_content 在 content 之前
       const message = { role: 'assistant' };
@@ -171,11 +189,37 @@ export const handleOpenAIRequest = async (req, res) => {
       };
       
       res.json(response);
+      
+      // Log success
+      requestLogger.logRequest({
+        model,
+        tokenId,
+        status: 'success',
+        statusCode: 200,
+        duration: Date.now() - startTime,
+        inputTokens: usageData?.prompt_tokens || 0,
+        outputTokens: usageData?.completion_tokens || 0,
+        isStream: false
+      });
     }
   } catch (error) {
     logger.error('生成响应失败:', error.message);
-    if (res.headersSent) return;
     const statusCode = error.statusCode || error.status || 500;
+    
+    // Log error
+    requestLogger.logRequest({
+      model,
+      tokenId,
+      status: 'error',
+      statusCode,
+      duration: Date.now() - startTime,
+      inputTokens: 0,
+      outputTokens: 0,
+      errorMessage: error.message,
+      isStream: stream
+    });
+    
+    if (res.headersSent) return;
     return res.status(statusCode).json(buildOpenAIErrorPayload(error, statusCode));
   }
 };

@@ -10,6 +10,7 @@ import { reloadConfig } from '../utils/configReloader.js';
 import { deepMerge } from '../utils/deepMerge.js';
 import { getModelsWithQuotas } from '../api/client.js';
 import { getEnvPath } from '../utils/paths.js';
+import requestLogger from '../utils/requestLogger.js';
 import dotenv from 'dotenv';
 
 const envPath = getEnvPath();
@@ -347,6 +348,33 @@ router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     logger.error('获取额度失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== API History ====================
+
+// Lấy lịch sử API requests
+router.get('/history', authMiddleware, (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const history = requestLogger.getHistory(limit);
+    const stats = requestLogger.getStats();
+    res.json({ success: true, data: { history, stats } });
+  } catch (error) {
+    logger.error('获取历史记录失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Xóa lịch sử
+router.delete('/history', authMiddleware, (req, res) => {
+  try {
+    requestLogger.clearHistory();
+    logger.info('历史记录已清空');
+    res.json({ success: true, message: '历史记录已清空' });
+  } catch (error) {
+    logger.error('清空历史记录失败:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
