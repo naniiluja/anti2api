@@ -35,6 +35,8 @@
         "refreshQuota": "Làm mới quota"
     },
     "settings": {
+        "sensitive": "Cài đặt nhạy cảm",
+        "apiDefaults": "Tham số API mặc định",
         "server": "Máy chủ",
         "port": "Cổng",
         "host": "Địa chỉ lắng nghe",

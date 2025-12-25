@@ -35,6 +35,8 @@
         "refreshQuota": "Refresh Quota"
     },
     "settings": {
+        "sensitive": "Sensitive Settings",
+        "apiDefaults": "API Defaults",
         "server": "Server",
         "port": "Port",
         "host": "Listen Address",
