@@ -18,7 +18,9 @@ export const I18nProvider = ({ children }) => {
         const loadLang = async (lang) => {
             if (resources[lang]) return;
             try {
-                const response = await fetch(`/locales/${lang}.json`);
+                // Add cache busting to ensure fresh translations
+                const cacheBust = Date.now();
+                const response = await fetch(`/locales/${lang}.json?v=${cacheBust}`);
                 const data = await response.json();
                 setResources(prev => ({ ...prev, [lang]: data }));
             } catch (error) {

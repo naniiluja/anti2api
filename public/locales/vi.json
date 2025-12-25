@@ -9,7 +9,8 @@
     "tabs": {
         "tokens": "Token",
         "settings": "Cài đặt",
-        "history": "Lịch sử"
+        "history": "Lịch sử",
+        "playground": "Playground"
     },
     "stats": {
         "total": "Tổng",
@@ -188,5 +189,42 @@
         "refreshToken": "Làm mới Token",
         "clickToShow": "Nhấn để hiện thông tin nhạy cảm",
         "clickToHide": "Nhấn để ẩn thông tin nhạy cảm"
+    },
+    "playground": {
+        "chatTab": "Trò chuyện",
+        "imageTab": "Hình ảnh",
+        "history": "Lịch sử",
+        "settings": "Cài đặt",
+        "parameters": "Thông số",
+        "newChat": "Cuộc trò chuyện mới",
+        "noSessions": "Chưa có phiên trò chuyện",
+        "startNew": "Bắt đầu mới",
+        "startChat": "Bắt đầu cuộc trò chuyện",
+        "typeMessage": "Nhập tin nhắn...",
+        "you": "Bạn",
+        "assistant": "Trợ lý",
+        "thinking": "Đang suy nghĩ...",
+        "reasoning": "Quá trình suy luận",
+        "generating": "Đang tạo...",
+        "tempHint": "Giá trị cao = sáng tạo hơn",
+        "reasoningHint": "Bật chế độ suy luận theo chuỗi",
+        "textToImage": "Văn bản thành Hình",
+        "imageToImage": "Hình thành Hình",
+        "gallery": "Thư viện ảnh",
+        "noImages": "Chưa có ảnh nào",
+        "uploadRequired": "Vui lòng tải ảnh lên trước",
+        "noImageGenerated": "Không tạo được ảnh",
+        "uploadImage": "Tải ảnh lên",
+        "enterPrompt": "Mô tả hình ảnh bạn muốn tạo...",
+        "generate": "Tạo ảnh",
+        "generatingImage": "Đang tạo hình ảnh...",
+        "saveToGallery": "Lưu vào thư viện",
+        "download": "Tải về",
+        "editImage": "Chỉnh sửa ảnh"
+    },
+    "common": {
+        "cancel": "Hủy",
+        "save": "Lưu",
+        "delete": "Xóa"
     }
 }

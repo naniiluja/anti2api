@@ -7,7 +7,7 @@
     "memoryThreshold": 50
   },
   "rotation": {
-    "strategy": "quota_exhausted",
+    "strategy": "round_robin",
     "requestCount": 50
   },
   "api": {

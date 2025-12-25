@@ -1,6 +1,6 @@
 /**
- * OpenAI 格式处理器
- * 处理 /v1/chat/completions 请求，支持流式和非流式响应
+ * OpenAI format handler
+ * Handles /v1/chat/completions requests, supports streaming and non-streaming responses
  */
 
 import { generateAssistantResponse, generateAssistantResponseNoStream } from '../../api/client.js';
@@ -22,13 +22,13 @@ import {
 } from '../stream.js';
 
 /**
- * 创建流式数据块
- * 支持 DeepSeek 格式的 reasoning_content
- * @param {string} id - 响应ID
- * @param {number} created - 创建时间戳
- * @param {string} model - 模型名称
- * @param {Object} delta - 增量内容
- * @param {string|null} finish_reason - 结束原因
+ * Create stream data chunk
+ * Supports DeepSeek format reasoning_content
+ * @param {string} id - Response ID
+ * @param {number} created - Created timestamp
+ * @param {string} model - Model name
+ * @param {Object} delta - Delta content
+ * @param {string|null} finish_reason - Finish reason
  * @returns {Object}
  */
 export const createStreamChunk = (id, created, model, delta, finish_reason = null) => {
@@ -43,30 +43,30 @@ export const createStreamChunk = (id, created, model, delta, finish_reason = nul
 };
 
 /**
- * 处理 OpenAI 格式的聊天请求
- * @param {Request} req - Express请求对象
- * @param {Response} res - Express响应对象
+ * Handle OpenAI format chat request
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
  */
 export const handleOpenAIRequest = async (req, res) => {
   const { messages, model, stream = false, tools, ...params } = req.body;
   const startTime = Date.now();
   let tokenId = null;
   let usageData = null;
-  
+
   try {
     if (!messages) {
       return res.status(400).json({ error: 'messages is required' });
     }
-    
+
     const token = await tokenManager.getToken();
     if (!token) {
-      throw new Error('没有可用的token，请运行 npm run login 获取token');
+      throw new Error('No available token. Please run npm run login to get a token');
     }
     tokenId = token.refresh_token?.substring(0, 8) || 'unknown';
-    
+
     const isImageModel = model.includes('-image');
     const requestBody = generateRequestBody(messages, model, params, tools, token);
-    
+
     if (isImageModel) {
       prepareImageRequest(requestBody);
     }
@@ -74,11 +74,11 @@ export const handleOpenAIRequest = async (req, res) => {
     const { id, created } = createResponseMeta();
     const maxRetries = Number(config.retryTimes || 0);
     const safeRetries = maxRetries > 0 ? Math.floor(maxRetries) : 0;
-    
+
     if (stream) {
       setStreamHeaders(res);
-      
-      // 启动心跳，防止 Cloudflare 超时断连
+
+      // Start heartbeat to prevent Cloudflare timeout disconnect
       const heartbeatTimer = createHeartbeat(res);
 
       try {
@@ -131,7 +131,7 @@ export const handleOpenAIRequest = async (req, res) => {
 
         clearInterval(heartbeatTimer);
         endStream(res);
-        
+
         // Log success
         requestLogger.logRequest({
           model,
@@ -148,23 +148,23 @@ export const handleOpenAIRequest = async (req, res) => {
         throw error;
       }
     } else {
-      // 非流式请求：设置较长超时，避免大模型响应超时
+      // Non-streaming request: set longer timeout for large model responses
       req.setTimeout(0); // 禁用请求超时
       res.setTimeout(0); // 禁用响应超时
-      
+
       const { content, reasoningContent, reasoningSignature, toolCalls, usage } = await with429Retry(
         () => generateAssistantResponseNoStream(requestBody, token),
         safeRetries,
         'chat.no_stream '
       );
       usageData = usage;
-      
-      // DeepSeek 格式：reasoning_content 在 content 之前
+
+      // DeepSeek format: reasoning_content comes before content
       const message = { role: 'assistant' };
       if (reasoningContent) message.reasoning_content = reasoningContent;
       if (reasoningSignature && config.passSignatureToClient) message.thoughtSignature = reasoningSignature;
       message.content = content;
-      
+
       if (toolCalls.length > 0) {
         // 根据配置决定是否透传工具调用中的签名
         if (config.passSignatureToClient) {
@@ -173,8 +173,8 @@ export const handleOpenAIRequest = async (req, res) => {
           message.tool_calls = toolCalls.map(({ thoughtSignature, ...rest }) => rest);
         }
       }
-      
-      // 使用预构建的响应对象，减少内存分配
+
+      // Use pre-built response object to reduce memory allocation
       const response = {
         id,
         object: 'chat.completion',
@@ -187,9 +187,9 @@ export const handleOpenAIRequest = async (req, res) => {
         }],
         usage
       };
-      
+
       res.json(response);
-      
+
       // Log success
       requestLogger.logRequest({
         model,
@@ -203,9 +203,9 @@ export const handleOpenAIRequest = async (req, res) => {
       });
     }
   } catch (error) {
-    logger.error('生成响应失败:', error.message);
+    logger.error('Failed to generate response:', error.message);
     const statusCode = error.statusCode || error.status || 500;
-    
+
     // Log error
     requestLogger.logRequest({
       model,
@@ -218,7 +218,7 @@ export const handleOpenAIRequest = async (req, res) => {
       errorMessage: error.message,
       isStream: stream
     });
-    
+
     if (res.headersSent) return;
     return res.status(statusCode).json(buildOpenAIErrorPayload(error, statusCode));
   }

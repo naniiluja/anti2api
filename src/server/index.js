@@ -147,24 +147,24 @@ server.on('error', (error) => {
 // ==================== 优雅关闭 ====================
 const shutdown = () => {
   logger.info('正在关闭服务器...');
-  
+
   // 停止内存管理器
   memoryManager.stop();
   logger.info('已停止内存管理器');
-  
+
   // 关闭子进程请求器
   closeRequester();
   logger.info('已关闭子进程请求器');
-  
+
   // 清理对象池
   clearChunkPool();
   logger.info('已清理对象池');
-  
+
   server.close(() => {
     logger.info('服务器已关闭');
     process.exit(0);
   });
-  
+
   // 5秒超时强制退出
   setTimeout(() => {
     logger.warn('服务器关闭超时，强制退出');

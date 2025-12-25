@@ -1,6 +1,6 @@
 /**
- * Gemini 格式处理器
- * 处理 /v1beta/models/* 请求，支持流式和非流式响应
+ * Gemini format handler
+ * Handles /v1beta/models/* requests, supports streaming and non-streaming responses
  */
 
 import { generateAssistantResponse, generateAssistantResponseNoStream, getAvailableModels } from '../../api/client.js';
@@ -18,18 +18,18 @@ import {
 } from '../stream.js';
 
 /**
- * 创建 Gemini 格式响应
- * @param {string|null} content - 文本内容
- * @param {string|null} reasoning - 思维链内容
- * @param {string|null} reasoningSignature - 思维链签名
- * @param {Array|null} toolCalls - 工具调用
- * @param {string|null} finishReason - 结束原因
- * @param {Object|null} usage - 使用量统计
+ * Create Gemini format response
+ * @param {string|null} content - Text content
+ * @param {string|null} reasoning - Chain of thought content
+ * @param {string|null} reasoningSignature - Chain of thought signature
+ * @param {Array|null} toolCalls - Tool calls
+ * @param {string|null} finishReason - Finish reason
+ * @param {Object|null} usage - Usage statistics
  * @returns {Object}
  */
 export const createGeminiResponse = (content, reasoning, reasoningSignature, toolCalls, finishReason, usage) => {
   const parts = [];
-  
+
   if (reasoning) {
     const thoughtPart = { text: reasoning, thought: true };
     if (reasoningSignature && config.passSignatureToClient) {
@@ -37,11 +37,11 @@ export const createGeminiResponse = (content, reasoning, reasoningSignature, too
     }
     parts.push(thoughtPart);
   }
-  
+
   if (content) {
     parts.push({ text: content });
   }
-  
+
   if (toolCalls && toolCalls.length > 0) {
     toolCalls.forEach(tc => {
       try {
@@ -56,7 +56,7 @@ export const createGeminiResponse = (content, reasoning, reasoningSignature, too
         }
         parts.push(functionCallPart);
       } catch (e) {
-        // 忽略解析错误
+        // Ignore parse error
       }
     });
   }
@@ -79,13 +79,13 @@ export const createGeminiResponse = (content, reasoning, reasoningSignature, too
       totalTokenCount: usage.total_tokens
     };
   }
-  
+
   return response;
 };
 
 /**
- * 将 OpenAI 模型列表转换为 Gemini 格式
- * @param {Object} openaiModels - OpenAI格式模型列表
+ * Convert OpenAI model list to Gemini format
+ * @param {Object} openaiModels - OpenAI format model list
  * @returns {Object}
  */
 export const convertToGeminiModelList = (openaiModels) => {
@@ -105,9 +105,9 @@ export const convertToGeminiModelList = (openaiModels) => {
 };
 
 /**
- * 获取 Gemini 格式模型列表
- * @param {Request} req - Express请求对象
- * @param {Response} res - Express响应对象
+ * Get Gemini format model list
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
  */
 export const handleGeminiModelsList = async (req, res) => {
   try {
@@ -115,22 +115,22 @@ export const handleGeminiModelsList = async (req, res) => {
     const geminiModels = convertToGeminiModelList(openaiModels);
     res.json(geminiModels);
   } catch (error) {
-    logger.error('获取模型列表失败:', error.message);
+    logger.error('Failed to get model list:', error.message);
     res.status(500).json({ error: { code: 500, message: error.message, status: "INTERNAL" } });
   }
 };
 
 /**
- * 获取单个模型详情（Gemini格式）
- * @param {Request} req - Express请求对象
- * @param {Response} res - Express响应对象
+ * Get single model detail (Gemini format)
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
  */
 export const handleGeminiModelDetail = async (req, res) => {
   try {
     const modelId = req.params.model.replace(/^models\//, '');
     const openaiModels = await getAvailableModels();
     const model = openaiModels.data.find(m => m.id === modelId);
-    
+
     if (model) {
       const geminiModel = {
         name: `models/${model.id}`,
@@ -149,31 +149,31 @@ export const handleGeminiModelDetail = async (req, res) => {
       res.status(404).json({ error: { code: 404, message: `Model ${modelId} not found`, status: "NOT_FOUND" } });
     }
   } catch (error) {
-    logger.error('获取模型详情失败:', error.message);
+    logger.error('Failed to get model detail:', error.message);
     res.status(500).json({ error: { code: 500, message: error.message, status: "INTERNAL" } });
   }
 };
 
 /**
- * 处理 Gemini 格式的聊天请求
- * @param {Request} req - Express请求对象
- * @param {Response} res - Express响应对象
- * @param {string} modelName - 模型名称
- * @param {boolean} isStream - 是否流式响应
+ * Handle Gemini format chat request
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @param {string} modelName - Model name
+ * @param {boolean} isStream - Whether streaming response
  */
 export const handleGeminiRequest = async (req, res, modelName, isStream) => {
   const maxRetries = Number(config.retryTimes || 0);
   const safeRetries = maxRetries > 0 ? Math.floor(maxRetries) : 0;
-  
+
   try {
     const token = await tokenManager.getToken();
     if (!token) {
-      throw new Error('没有可用的token，请运行 npm run login 获取token');
+      throw new Error('No available token. Please run npm run login to get a token');
     }
 
     const isImageModel = modelName.includes('-image');
     const requestBody = generateGeminiRequestBody(req.body, modelName, token);
-    
+
     if (isImageModel) {
       prepareImageRequest(requestBody);
     }
@@ -184,7 +184,7 @@ export const handleGeminiRequest = async (req, res, modelName, isStream) => {
 
       try {
         if (isImageModel) {
-          // 生图模型：使用非流式获取结果后一次性返回
+          // Image model: get result non-streaming then return at once
           const { content, usage } = await with429Retry(
             () => generateAssistantResponseNoStream(requestBody, token),
             safeRetries,
@@ -196,7 +196,7 @@ export const handleGeminiRequest = async (req, res, modelName, isStream) => {
           endStream(res, false);
           return;
         }
-        
+
         let usageData = null;
         let hasToolCall = false;
 
@@ -205,16 +205,16 @@ export const handleGeminiRequest = async (req, res, modelName, isStream) => {
             if (data.type === 'usage') {
               usageData = data.usage;
             } else if (data.type === 'reasoning') {
-              // Gemini 思考内容
+              // Gemini thinking content
               const chunk = createGeminiResponse(null, data.reasoning_content, data.thoughtSignature, null, null, null);
               writeStreamData(res, chunk);
             } else if (data.type === 'tool_calls') {
               hasToolCall = true;
-              // Gemini 工具调用
+              // Gemini tool calls
               const chunk = createGeminiResponse(null, null, null, data.tool_calls, null, null);
               writeStreamData(res, chunk);
             } else {
-              // 普通文本
+              // Normal text
               const chunk = createGeminiResponse(data.content, null, null, null, null, null);
               writeStreamData(res, chunk);
             }
@@ -223,7 +223,7 @@ export const handleGeminiRequest = async (req, res, modelName, isStream) => {
           'gemini.stream '
         );
 
-        // 发送结束块和 usage
+        // Send finish chunk and usage
         const finishReason = hasToolCall ? "STOP" : "STOP"; // Gemini 工具调用也是 STOP
         const finalChunk = createGeminiResponse(null, null, null, null, finishReason, usageData);
         writeStreamData(res, finalChunk);
@@ -237,11 +237,11 @@ export const handleGeminiRequest = async (req, res, modelName, isStream) => {
           writeStreamData(res, buildGeminiErrorPayload(error, statusCode));
           endStream(res);
         }
-        logger.error('Gemini 流式请求失败:', error.message);
+        logger.error('Gemini stream request failed:', error.message);
         return;
       }
     } else {
-      // 非流式
+      // Non-streaming
       req.setTimeout(0);
       res.setTimeout(0);
 
@@ -256,7 +256,7 @@ export const handleGeminiRequest = async (req, res, modelName, isStream) => {
       res.json(response);
     }
   } catch (error) {
-    logger.error('Gemini 请求失败:', error.message);
+    logger.error('Gemini request failed:', error.message);
     if (res.headersSent) return;
     const statusCode = error.statusCode || error.status || 500;
     res.status(statusCode).json(buildGeminiErrorPayload(error, statusCode));

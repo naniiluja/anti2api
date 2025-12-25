@@ -6,6 +6,7 @@ import LoginPage from '../features/auth/LoginPage';
 import TokensPage from '../features/tokens/TokensPage';
 import SettingsPage from '../features/settings/SettingsPage';
 import HistoryPage from '../features/history/HistoryPage';
+import PlaygroundPage from '../features/playground/PlaygroundPage';
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, isLoading } = useAuth();
@@ -29,6 +30,7 @@ const AppRoutes = () => {
                 <Route index element={<TokensPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="history" element={<HistoryPage />} />
+                <Route path="playground" element={<PlaygroundPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

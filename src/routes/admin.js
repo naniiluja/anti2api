@@ -25,18 +25,18 @@ const ATTEMPT_WINDOW = 15 * 60 * 1000; // 15分钟窗口
 
 function getClientIP(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-         req.headers['x-real-ip'] ||
-         req.connection?.remoteAddress ||
-         req.ip ||
-         'unknown';
+    req.headers['x-real-ip'] ||
+    req.connection?.remoteAddress ||
+    req.ip ||
+    'unknown';
 }
 
 function checkLoginRateLimit(ip) {
   const now = Date.now();
   const attempt = loginAttempts.get(ip);
-  
+
   if (!attempt) return { allowed: true };
-  
+
   // 检查是否被封禁
   if (attempt.blockedUntil && now < attempt.blockedUntil) {
     const remainingSeconds = Math.ceil((attempt.blockedUntil - now) / 1000);
@@ -46,43 +46,43 @@ function checkLoginRateLimit(ip) {
       remainingSeconds
     };
   }
-  
+
   // 清理过期的尝试记录
   if (now - attempt.lastAttempt > ATTEMPT_WINDOW) {
     loginAttempts.delete(ip);
     return { allowed: true };
   }
-  
+
   return { allowed: true };
 }
 
 function recordLoginAttempt(ip, success) {
   const now = Date.now();
-  
+
   if (success) {
     // 登录成功，清除记录
     loginAttempts.delete(ip);
     return;
   }
-  
+
   // 登录失败，记录尝试
   const attempt = loginAttempts.get(ip) || { count: 0, lastAttempt: now };
   attempt.count++;
   attempt.lastAttempt = now;
-  
+
   // 超过最大尝试次数，封禁
   if (attempt.count >= MAX_LOGIN_ATTEMPTS) {
     attempt.blockedUntil = now + BLOCK_DURATION;
     logger.warn(`IP ${ip} 因登录失败次数过多被暂时封禁`);
   }
-  
+
   loginAttempts.set(ip, attempt);
 }
 
 // 登录接口
 router.post('/login', (req, res) => {
   const clientIP = getClientIP(req);
-  
+
   // 检查速率限制
   const rateCheck = checkLoginRateLimit(clientIP);
   if (!rateCheck.allowed) {
@@ -92,19 +92,19 @@ router.post('/login', (req, res) => {
       retryAfter: rateCheck.remainingSeconds
     });
   }
-  
+
   const { username, password } = req.body;
-  
+
   // 验证输入
   if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
     return res.status(400).json({ success: false, message: '用户名和密码必填' });
   }
-  
+
   // 限制输入长度防止 DoS
   if (username.length > 100 || password.length > 100) {
     return res.status(400).json({ success: false, message: '输入过长' });
   }
-  
+
   if (username === config.admin.username && password === config.admin.password) {
     recordLoginAttempt(clientIP, true);
     const token = generateToken({ username, role: 'admin' });
@@ -136,7 +136,7 @@ router.post('/tokens', authMiddleware, async (req, res) => {
   if (enable !== undefined) tokenData.enable = enable;
   if (projectId) tokenData.projectId = projectId;
   if (email) tokenData.email = email;
-  
+
   try {
     const result = await tokenManager.addToken(tokenData);
     res.json(result);
@@ -186,11 +186,11 @@ router.post('/tokens/:refreshToken/refresh', authMiddleware, async (req, res) =>
     logger.info('正在刷新token...');
     const tokens = await tokenManager.getTokenList();
     const tokenData = tokens.find(t => t.refresh_token === refreshToken);
-    
+
     if (!tokenData) {
       return res.status(404).json({ success: false, message: 'Token不存在' });
     }
-    
+
     // 调用 tokenManager 的刷新方法
     const refreshedToken = await tokenManager.refreshToken(tokenData);
     res.json({ success: true, message: 'Token刷新成功', data: { expires_in: refreshedToken.expires_in, timestamp: refreshedToken.timestamp } });
@@ -205,11 +205,11 @@ router.post('/oauth/exchange', authMiddleware, async (req, res) => {
   if (!code || !port) {
     return res.status(400).json({ success: false, message: 'code和port必填' });
   }
-  
+
   try {
     const account = await oauthManager.authenticate(code, port);
-    const message = account.hasQuota 
-      ? 'Token添加成功' 
+    const message = account.hasQuota
+      ? 'Token添加成功'
       : 'Token添加成功（该账号无资格，已自动使用随机ProjectId）';
     res.json({ success: true, data: account, message, fallbackMode: !account.hasQuota });
   } catch (error) {
@@ -234,13 +234,13 @@ router.get('/config', authMiddleware, (req, res) => {
 router.put('/config', authMiddleware, (req, res) => {
   try {
     const { env: envUpdates, json: jsonUpdates } = req.body;
-    
+
     if (envUpdates) updateEnvFile(envPath, envUpdates);
     if (jsonUpdates) saveConfigJson(deepMerge(getConfigJson(), jsonUpdates));
-    
+
     dotenv.config({ override: true });
     reloadConfig();
-    
+
     logger.info('配置已更新并热重载');
     res.json({ success: true, message: '配置已保存并生效（端口/HOST修改需重启）' });
   } catch (error) {
@@ -264,7 +264,7 @@ router.get('/rotation', authMiddleware, (req, res) => {
 router.put('/rotation', authMiddleware, (req, res) => {
   try {
     const { strategy, requestCount } = req.body;
-    
+
     // 验证策略值
     const validStrategies = ['round_robin', 'quota_exhausted', 'request_count'];
     if (strategy && !validStrategies.includes(strategy)) {
@@ -273,20 +273,20 @@ router.put('/rotation', authMiddleware, (req, res) => {
         message: `无效的策略，可选值: ${validStrategies.join(', ')}`
       });
     }
-    
+
     // 更新内存中的配置
     tokenManager.updateRotationConfig(strategy, requestCount);
-    
+
     // 保存到config.json
     const currentConfig = getConfigJson();
     if (!currentConfig.rotation) currentConfig.rotation = {};
     if (strategy) currentConfig.rotation.strategy = strategy;
     if (requestCount) currentConfig.rotation.requestCount = requestCount;
     saveConfigJson(currentConfig);
-    
+
     // 重载配置到内存
     reloadConfig();
-    
+
     logger.info(`轮询策略已更新: ${strategy || '未变'}, 请求次数: ${requestCount || '未变'}`);
     res.json({ success: true, message: '轮询策略已更新', data: tokenManager.getRotationConfig() });
   } catch (error) {
@@ -302,11 +302,11 @@ router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
     const forceRefresh = req.query.refresh === 'true';
     const tokens = await tokenManager.getTokenList();
     let tokenData = tokens.find(t => t.refresh_token === refreshToken);
-    
+
     if (!tokenData) {
       return res.status(404).json({ success: false, message: 'Token不存在' });
     }
-    
+
     // 检查token是否过期，如果过期则刷新
     if (tokenManager.isExpired(tokenData)) {
       try {
@@ -317,10 +317,10 @@ router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
         return res.status(400).json({ success: false, message: 'Google Token已过期且刷新失败，请重新登录Google账号' });
       }
     }
-    
+
     // 先从缓存获取（除非强制刷新）
     let quotaData = forceRefresh ? null : quotaManager.getQuota(refreshToken);
-    
+
     if (!quotaData) {
       // 缓存未命中或强制刷新，从API获取
       const token = { access_token: tokenData.access_token, refresh_token: refreshToken };
@@ -328,7 +328,7 @@ router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
       quotaManager.updateQuota(refreshToken, quotas);
       quotaData = { lastUpdated: Date.now(), models: quotas };
     }
-    
+
     // 转换时间为北京时间
     const modelsWithBeijingTime = {};
     Object.entries(quotaData.models).forEach(([modelId, quota]) => {
@@ -338,13 +338,13 @@ router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
         resetTimeRaw: quota.t
       };
     });
-    
-    res.json({ 
-      success: true, 
-      data: { 
+
+    res.json({
+      success: true,
+      data: {
         lastUpdated: quotaData.lastUpdated,
-        models: modelsWithBeijingTime 
-      } 
+        models: modelsWithBeijingTime
+      }
     });
   } catch (error) {
     logger.error('获取额度失败:', error.message);
@@ -363,6 +363,34 @@ router.get('/history', authMiddleware, (req, res) => {
     res.json({ success: true, data: { history, stats } });
   } catch (error) {
     logger.error('获取历史记录失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Thêm entry vào lịch sử (cho Playground errors)
+router.post('/history', authMiddleware, (req, res) => {
+  try {
+    const { model, status, statusCode, duration, errorMessage, source } = req.body;
+
+    if (!model || !status) {
+      return res.status(400).json({ success: false, message: 'model và status là bắt buộc' });
+    }
+
+    const record = requestLogger.logRequest({
+      model,
+      status,
+      statusCode: statusCode || null,
+      duration: duration || 0,
+      errorMessage: errorMessage || null,
+      tokenId: source || 'playground', // Đánh dấu nguồn là playground
+      inputTokens: 0,
+      outputTokens: 0,
+      isStream: false
+    });
+
+    res.json({ success: true, data: record });
+  } catch (error) {
+    logger.error('Thêm lịch sử thất bại:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });

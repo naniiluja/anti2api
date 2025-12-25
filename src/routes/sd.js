@@ -69,9 +69,9 @@ const SD_MOCK_DATA = {
 };
 
 // 构建图片生成请求体
-function buildImageRequestBody(prompt, token) {
+function buildImageRequestBody(prompt, token, model = 'gemini-3-pro-image') {
   const messages = [{ role: 'user', content: prompt }];
-  const requestBody = generateRequestBody(messages, 'gemini-3-pro-image', {}, null, token);
+  const requestBody = generateRequestBody(messages, model, {}, null, token);
   return prepareImageRequest(requestBody);
 }
 
@@ -91,7 +91,7 @@ router.get('/sd-models', async (req, res) => {
       }));
     res.json(imageModels);
   } catch (error) {
-    logger.error('获取SD模型列表失败:', error.message);
+    logger.error('Failed to get SD models:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -112,21 +112,21 @@ router.get('/progress', (req, res) => res.json(SD_MOCK_DATA.progress));
 router.get('/cmd-flags', (req, res) => res.json({}));
 router.get('/memory', (req, res) => res.json({ ram: { free: 8589934592, used: 8589934592, total: 17179869184 }, cuda: { system: { free: 0, used: 0, total: 0 } } }));
 
-// POST 路由
+// POST routes
 router.post('/img2img', async (req, res) => {
   const { prompt, init_images } = req.body;
-  
+
   try {
     if (!prompt) {
       return res.status(400).json({ error: 'prompt is required' });
     }
-    
+
     const token = await tokenManager.getToken();
     if (!token) {
-      throw new Error('没有可用的token');
+      throw new Error('No available token');
     }
-    
-    // 构建包含图片的消息
+
+    // Build message content with images
     const content = [{ type: 'text', text: prompt }];
     if (init_images && init_images.length > 0) {
       init_images.forEach(img => {
@@ -134,56 +134,58 @@ router.post('/img2img', async (req, res) => {
         content.push({ type: 'image_url', image_url: { url: `data:image/${format};base64,${img}` } });
       });
     }
-    
+
     const messages = [{ role: 'user', content }];
+    const model = req.body.model || 'gemini-3-pro-image';
     const requestBody = prepareImageRequest(
-      generateRequestBody(messages, 'gemini-3-pro-image', {}, null, token)
+      generateRequestBody(messages, model, {}, null, token)
     );
-    
+
     const images = await generateImageForSD(requestBody, token);
-    
+
     if (images.length === 0) {
-      throw new Error('未生成图片');
+      throw new Error('No image generated');
     }
-    
+
     res.json({
       images,
       parameters: req.body,
       info: JSON.stringify({ prompt })
     });
   } catch (error) {
-    logger.error('SD图生图失败:', error.message);
+    logger.error('SD img2img failed:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
 router.post('/txt2img', async (req, res) => {
   const { prompt, negative_prompt, steps, cfg_scale, width, height, seed, sampler_name } = req.body;
-  
+
   try {
     if (!prompt) {
       return res.status(400).json({ error: 'prompt is required' });
     }
-    
+
     const token = await tokenManager.getToken();
     if (!token) {
-      throw new Error('没有可用的token');
+      throw new Error('No available token');
     }
-    
-    const requestBody = buildImageRequestBody(prompt, token);
+
+    const model = req.body.model || 'gemini-3-pro-image';
+    const requestBody = buildImageRequestBody(prompt, token, model);
     const images = await generateImageForSD(requestBody, token);
-    
+
     if (images.length === 0) {
-      throw new Error('未生成图片');
+      throw new Error('No image generated');
     }
-    
+
     res.json({
       images,
       parameters: { prompt, negative_prompt, steps, cfg_scale, width, height, seed, sampler_name },
       info: JSON.stringify({ prompt, seed: seed || -1 })
     });
   } catch (error) {
-    logger.error('SD生图失败:', error.message);
+    logger.error('SD txt2img failed:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

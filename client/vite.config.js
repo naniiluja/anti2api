@@ -37,6 +37,11 @@ export default defineConfig({
         target: `http://localhost:${backendPort}`,
         changeOrigin: true,
         secure: false,
+      },
+      '/sdapi': {
+        target: `http://localhost:${backendPort}`,
+        changeOrigin: true,
+        secure: false,
       }
     }
   }

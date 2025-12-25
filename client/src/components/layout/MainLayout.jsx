@@ -4,7 +4,7 @@ import { useI18n } from '../../context/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import LanguageSelector from '../common/LanguageSelector';
 import Dock from '../common/Dock';
-import { VscHome, VscSettingsGear, VscSignOut, VscColorMode, VscHistory } from 'react-icons/vsc';
+import { VscHome, VscSettingsGear, VscSignOut, VscColorMode, VscHistory, VscBeaker } from 'react-icons/vsc';
 
 const MainLayout = () => {
     const { logout } = useAuth();
@@ -17,7 +17,9 @@ const MainLayout = () => {
         ? 'settings'
         : location.pathname.includes('history')
             ? 'history'
-            : 'tokens';
+            : location.pathname.includes('playground')
+                ? 'playground'
+                : 'tokens';
 
     const dockItems = [
         {
@@ -31,6 +33,12 @@ const MainLayout = () => {
             label: t('tabs.history') || 'History',
             onClick: () => navigate('/history'),
             active: activeTab === 'history'
+        },
+        {
+            icon: <VscBeaker size={20} />,
+            label: t('tabs.playground') || 'Playground',
+            onClick: () => navigate('/playground'),
+            active: activeTab === 'playground'
         },
         {
             icon: <VscSettingsGear size={20} />,

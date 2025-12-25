@@ -9,7 +9,8 @@
     "tabs": {
         "tokens": "Token",
         "settings": "Settings",
-        "history": "History"
+        "history": "History",
+        "playground": "Playground"
     },
     "stats": {
         "total": "Total",
@@ -188,5 +189,42 @@
         "refreshToken": "Refresh Token",
         "clickToShow": "Click to show sensitive info",
         "clickToHide": "Click to hide sensitive info"
+    },
+    "playground": {
+        "chatTab": "Chat",
+        "imageTab": "Image",
+        "history": "History",
+        "settings": "Settings",
+        "parameters": "Parameters",
+        "newChat": "New Chat",
+        "noSessions": "No chat sessions yet",
+        "startNew": "Start New",
+        "startChat": "Start a new conversation",
+        "typeMessage": "Type a message...",
+        "you": "You",
+        "assistant": "Assistant",
+        "thinking": "Thinking...",
+        "reasoning": "Reasoning",
+        "generating": "Generating...",
+        "tempHint": "Higher values = more creative",
+        "reasoningHint": "Enable chain-of-thought reasoning",
+        "textToImage": "Text to Image",
+        "imageToImage": "Image to Image",
+        "gallery": "Gallery",
+        "noImages": "No images saved yet",
+        "uploadRequired": "Please upload an image first",
+        "noImageGenerated": "No image was generated",
+        "uploadImage": "Upload Image",
+        "enterPrompt": "Describe the image you want to generate...",
+        "generate": "Generate",
+        "generatingImage": "Generating image...",
+        "saveToGallery": "Save to Gallery",
+        "download": "Download",
+        "editImage": "Edit Image"
+    },
+    "common": {
+        "cancel": "Cancel",
+        "save": "Save",
+        "delete": "Delete"
     }
 }

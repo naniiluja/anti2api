@@ -32,8 +32,16 @@ axiosClient.interceptors.response.use(
     return response.data;
   },
   (error) => {
-    // Handle 401
-    // if (error.response && error.response.status === 401) { ... }
+    // Handle 401 - Token expired or invalid
+    if (error.response && error.response.status === 401) {
+      // Clear token from localStorage
+      localStorage.removeItem('authToken');
+
+      // Redirect to login page if not already there
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
     return Promise.reject(error);
   }
 );
