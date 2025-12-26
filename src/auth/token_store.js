@@ -5,8 +5,8 @@ import { FILE_CACHE_TTL } from '../constants/index.js';
 import { log } from '../utils/logger.js';
 
 /**
- * 负责 token 文件的读写与简单缓存
- * 不关心业务字段，只处理 JSON 数组的加载和保存
+ * Responsible for token file reading/writing and simple caching
+ * Does not care about business fields, only handles JSON array loading and saving
  */
 class TokenStore {
   constructor(filePath = path.join(getDataDir(), 'accounts.json')) {
@@ -21,15 +21,15 @@ class TokenStore {
     try {
       await fs.mkdir(dir, { recursive: true });
     } catch (e) {
-      // 目录已存在等情况忽略
+      // Ignore cases like directory already exists
     }
 
     try {
       await fs.access(this.filePath);
     } catch (e) {
-      // 文件不存在时创建空数组
+      // Create empty array when file doesn't exist
       await fs.writeFile(this.filePath, '[]', 'utf8');
-      log.info('✓ 已创建账号配置文件');
+      log.info('✓ Created accounts configuration file');
     }
   }
 
@@ -40,7 +40,7 @@ class TokenStore {
   }
 
   /**
-   * 读取全部 token（包含禁用的），带简单内存缓存
+   * Read all tokens (including disabled ones), with simple memory cache
    * @returns {Promise<Array<object>>}
    */
   async readAll() {
@@ -53,13 +53,13 @@ class TokenStore {
       const data = await fs.readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(data || '[]');
       if (!Array.isArray(parsed)) {
-        log.warn('账号配置文件格式异常，已重置为空数组');
+        log.warn('Accounts configuration file format error, reset to empty array');
         this._cache = [];
       } else {
         this._cache = parsed;
       }
     } catch (error) {
-      log.error('读取账号配置文件失败:', error.message);
+      log.error('Failed to read accounts configuration file:', error.message);
       this._cache = [];
     }
     this._cacheTime = Date.now();
@@ -67,7 +67,7 @@ class TokenStore {
   }
 
   /**
-   * 覆盖写入全部 token，更新缓存
+   * Overwrite all tokens, update cache
    * @param {Array<object>} tokens
    */
   async writeAll(tokens) {
@@ -78,17 +78,17 @@ class TokenStore {
       this._cache = normalized;
       this._cacheTime = Date.now();
     } catch (error) {
-      log.error('保存账号配置文件失败:', error.message);
+      log.error('Failed to save accounts configuration file:', error.message);
       throw error;
     }
   }
 
   /**
-   * 根据内存中的启用 token 列表，将对应记录合并回文件
-   * - 仅按 refresh_token 匹配并更新已有记录
-   * - 未出现在 activeTokens 中的记录（例如已禁用账号）保持不变
-   * @param {Array<object>} activeTokens - 内存中的启用 token 列表（可能包含 sessionId）
-   * @param {object|null} tokenToUpdate - 如果只需要单个更新，可传入该 token 以减少遍历
+   * Merge active tokens from memory back to file based on refresh_token
+   * - Only match and update existing records by refresh_token
+   * - Records not in activeTokens (e.g., disabled accounts) remain unchanged
+   * @param {Array<object>} activeTokens - Active token list in memory (may contain sessionId)
+   * @param {object|null} tokenToUpdate - If only single update needed, pass this token to reduce traversal
    */
   async mergeActiveTokens(activeTokens, tokenToUpdate = null) {
     const allTokens = [...await this.readAll()];

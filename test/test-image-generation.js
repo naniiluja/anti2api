@@ -5,8 +5,8 @@ const API_URL = 'http://localhost:8045/v1/chat/completions';
 const API_KEY = 'sk-text';
 
 async function testImageGeneration(stream = true) {
-  console.log(`测试生图模型 (${stream ? '流式' : '非流式'})...\n`);
-  
+  console.log(`Testing image generation model (${stream ? 'streaming' : 'non-streaming'})...\n`);
+
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: {
@@ -15,13 +15,13 @@ async function testImageGeneration(stream = true) {
     },
     body: JSON.stringify({
       model: 'gemini-2.5-flash-image',
-      messages: [{ role: 'user', content: '画一个二次元美少女' }],
+      messages: [{ role: 'user', content: 'Draw an anime girl' }],
       stream
     })
   });
 
   let fullContent = '';
-  
+
   if (stream) {
     let buffer = '';
     const reader = response.body.getReader();
@@ -30,18 +30,18 @@ async function testImageGeneration(stream = true) {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop();
-      
+
       for (const line of lines) {
         if (!line.startsWith('data: ') || line.includes('[DONE]')) continue;
         try {
           const data = JSON.parse(line.slice(6));
           const content = data.choices[0]?.delta?.content;
           if (content) fullContent = content;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   } else {
@@ -49,28 +49,28 @@ async function testImageGeneration(stream = true) {
     fullContent = data.choices[0]?.message?.content || '';
   }
 
-  console.log('响应内容:\n', fullContent.substring(0, 200), '...\n');
-  
-  // 提取markdown中的图片
+  console.log('Response content:\n', fullContent.substring(0, 200), '...\n');
+
+  // Extract images from markdown
   const imageRegex = /!\[.*?\]\((data:image\/(.*?);base64,([^)]+))\)/g;
   let match;
   let imageCount = 0;
-  
+
   while ((match = imageRegex.exec(fullContent)) !== null) {
     imageCount++;
     const base64Data = match[3];
     const ext = match[2];
     const filename = `generated_${Date.now()}_${imageCount}.${ext}`;
     const filepath = path.join('test', filename);
-    
+
     fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
-    console.log(`✓ 图片已保存: ${filepath}`);
+    console.log(`✓ Image saved: ${filepath}`);
   }
-  
+
   if (imageCount === 0) {
-    console.log('✗ 未找到图片');
+    console.log('✗ No images found');
   } else {
-    console.log(`\n✓ 共保存 ${imageCount} 张图片`);
+    console.log(`\n✓ Total ${imageCount} images saved`);
   }
 }
 

@@ -1,26 +1,26 @@
 /**
- * 内存优化效果测试脚本
- * 用于验证服务的内存使用是否控制在目标范围内（约20MB）
+ * Memory optimization test script
+ * Used to verify that service memory usage is controlled within target range (~20MB)
  */
 
 const http = require('http');
 const { spawn } = require('child_process');
 const path = require('path');
 
-// 配置
+// Configuration
 const PORT = process.env.PORT || 9876;
 const BASE_URL = `http://localhost:${PORT}`;
-const TEST_DURATION_MS = 60000; // 测试持续时间：60秒
-const SAMPLE_INTERVAL_MS = 2000; // 采样间隔：2秒
-const REQUEST_INTERVAL_MS = 1000; // 请求间隔：1秒
+const TEST_DURATION_MS = 60000; // Test duration: 60 seconds
+const SAMPLE_INTERVAL_MS = 2000; // Sampling interval: 2 seconds
+const REQUEST_INTERVAL_MS = 1000; // Request interval: 1 second
 
-// 内存采样数据
+// Memory sample data
 const memorySamples = [];
 let serverProcess = null;
 let testStartTime = null;
 
 /**
- * 格式化内存大小
+ * Format memory size
  */
 function formatMemory(bytes) {
   const mb = bytes / 1024 / 1024;
@@ -28,7 +28,7 @@ function formatMemory(bytes) {
 }
 
 /**
- * 发送HTTP请求
+ * Send HTTP request
  */
 function sendRequest(urlPath, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
@@ -64,7 +64,7 @@ function sendRequest(urlPath, method = 'GET', body = null) {
 }
 
 /**
- * 获取服务器内存使用情况（通过 /v1/memory 端点）
+ * Get server memory usage (via /v1/memory endpoint)
  */
 async function getServerMemory() {
   try {
@@ -74,40 +74,42 @@ async function getServerMemory() {
       return data;
     }
   } catch (e) {
-    // 如果端点不存在，返回 null
+    // If endpoint doesn't exist, return null
   }
   return null;
 }
 
 /**
- * 模拟API请求
+ * Simulate API requests
  */
 async function simulateLoad() {
   const requests = [
     { path: '/v1/models', method: 'GET' },
     { path: '/health', method: 'GET' },
-    { path: '/v1/chat/completions', method: 'POST', body: {
-      model: 'test-model',
-      messages: [{ role: 'user', content: 'Hello, this is a test message for memory optimization.' }],
-      stream: false
-    }},
+    {
+      path: '/v1/chat/completions', method: 'POST', body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'Hello, this is a test message for memory optimization.' }],
+        stream: false
+      }
+    },
   ];
 
   const randomRequest = requests[Math.floor(Math.random() * requests.length)];
   try {
     await sendRequest(randomRequest.path, randomRequest.method, randomRequest.body);
   } catch (e) {
-    // 忽略请求错误，重点是测试内存
+    // Ignore request errors, focus on testing memory
   }
 }
 
 /**
- * 启动服务器进程
+ * Start server process
  */
 function startServer() {
   return new Promise((resolve, reject) => {
-    console.log('🚀 启动服务器...');
-    
+    console.log('🚀 Starting server...');
+
     const serverPath = path.join(__dirname, '..', 'src', 'server', 'index.js');
     serverProcess = spawn('node', ['--expose-gc', serverPath], {
       cwd: path.join(__dirname, '..'),
@@ -116,12 +118,12 @@ function startServer() {
     });
 
     let started = false;
-    
+
     serverProcess.stdout.on('data', (data) => {
       const output = data.toString();
-      if (!started && (output.includes('listening') || output.includes('Server started') || output.includes('服务器'))) {
+      if (!started && (output.includes('listening') || output.includes('Server started') || output.includes('started'))) {
         started = true;
-        setTimeout(resolve, 1000); // 等待服务器完全就绪
+        setTimeout(resolve, 1000); // Wait for server to be fully ready
       }
     });
 
@@ -131,34 +133,34 @@ function startServer() {
 
     serverProcess.on('error', reject);
 
-    // 超时处理
+    // Timeout handling
     setTimeout(() => {
       if (!started) {
         started = true;
-        resolve(); // 即使没有检测到启动消息，也继续测试
+        resolve(); // Continue testing even if startup message not detected
       }
     }, 5000);
   });
 }
 
 /**
- * 停止服务器进程
+ * Stop server process
  */
 function stopServer() {
   if (serverProcess) {
-    console.log('\n🛑 停止服务器...');
+    console.log('\n🛑 Stopping server...');
     serverProcess.kill('SIGTERM');
     serverProcess = null;
   }
 }
 
 /**
- * 采集内存样本
+ * Collect memory sample
  */
 async function collectMemorySample() {
   const memoryInfo = await getServerMemory();
   const elapsed = Date.now() - testStartTime;
-  
+
   if (memoryInfo) {
     memorySamples.push({
       time: elapsed,
@@ -167,22 +169,22 @@ async function collectMemorySample() {
       rss: memoryInfo.rss,
       external: memoryInfo.external
     });
-    
-    console.log(`📊 [${(elapsed/1000).toFixed(1)}s] Heap: ${formatMemory(memoryInfo.heapUsed)} / ${formatMemory(memoryInfo.heapTotal)}, RSS: ${formatMemory(memoryInfo.rss)}`);
+
+    console.log(`📊 [${(elapsed / 1000).toFixed(1)}s] Heap: ${formatMemory(memoryInfo.heapUsed)} / ${formatMemory(memoryInfo.heapTotal)}, RSS: ${formatMemory(memoryInfo.rss)}`);
   } else {
-    // 如果没有内存端点，使用进程内存估算
+    // If no memory endpoint, use process memory estimate
     const usage = process.memoryUsage();
-    console.log(`📊 [${(elapsed/1000).toFixed(1)}s] 测试进程内存 - Heap: ${formatMemory(usage.heapUsed)}, RSS: ${formatMemory(usage.rss)}`);
+    console.log(`📊 [${(elapsed / 1000).toFixed(1)}s] Test process memory - Heap: ${formatMemory(usage.heapUsed)}, RSS: ${formatMemory(usage.rss)}`);
   }
 }
 
 /**
- * 分析内存数据
+ * Analyze memory data
  */
 function analyzeResults() {
   if (memorySamples.length === 0) {
-    console.log('\n⚠️ 没有采集到内存数据（服务器可能没有 /v1/memory 端点）');
-    console.log('请手动检查服务器日志中的内存使用情况。');
+    console.log('\n⚠️ No memory data collected (server may not have /v1/memory endpoint)');
+    console.log('Please manually check server logs for memory usage.');
     return;
   }
 
@@ -197,87 +199,87 @@ function analyzeResults() {
   const rssMax = Math.max(...rssValues);
   const rssAvg = rssValues.reduce((a, b) => a + b, 0) / rssValues.length;
 
-  console.log('\n📈 内存统计分析');
+  console.log('\n📈 Memory Statistics Analysis');
   console.log('═'.repeat(50));
-  console.log(`采样数量: ${memorySamples.length}`);
-  console.log(`测试时长: ${((memorySamples[memorySamples.length-1]?.time || 0) / 1000).toFixed(1)} 秒`);
+  console.log(`Sample count: ${memorySamples.length}`);
+  console.log(`Test duration: ${((memorySamples[memorySamples.length - 1]?.time || 0) / 1000).toFixed(1)} seconds`);
   console.log('');
-  console.log('Heap 使用:');
-  console.log(`  最小: ${formatMemory(heapMin)}`);
-  console.log(`  最大: ${formatMemory(heapMax)}`);
-  console.log(`  平均: ${formatMemory(heapAvg)}`);
+  console.log('Heap Usage:');
+  console.log(`  Min: ${formatMemory(heapMin)}`);
+  console.log(`  Max: ${formatMemory(heapMax)}`);
+  console.log(`  Avg: ${formatMemory(heapAvg)}`);
   console.log('');
-  console.log('RSS (常驻内存):');
-  console.log(`  最小: ${formatMemory(rssMin)}`);
-  console.log(`  最大: ${formatMemory(rssMax)}`);
-  console.log(`  平均: ${formatMemory(rssAvg)}`);
+  console.log('RSS (Resident Set Size):');
+  console.log(`  Min: ${formatMemory(rssMin)}`);
+  console.log(`  Max: ${formatMemory(rssMax)}`);
+  console.log(`  Avg: ${formatMemory(rssAvg)}`);
   console.log('');
 
-  // 评估是否达到目标
+  // Evaluate if target is met
   const TARGET_HEAP = 20 * 1024 * 1024; // 20MB
-  const TARGET_RSS = 50 * 1024 * 1024;  // 50MB (RSS 通常比 heap 大)
+  const TARGET_RSS = 50 * 1024 * 1024;  // 50MB (RSS is usually larger than heap)
 
   if (heapAvg <= TARGET_HEAP) {
-    console.log('✅ 堆内存使用达标！平均使用低于 20MB 目标。');
+    console.log('✅ Heap memory usage on target! Average usage below 20MB target.');
   } else {
-    console.log(`⚠️ 堆内存使用未达标。平均 ${formatMemory(heapAvg)}，目标 20MB。`);
+    console.log(`⚠️ Heap memory usage not on target. Average ${formatMemory(heapAvg)}, target 20MB.`);
   }
 
   if (heapMax - heapMin < 10 * 1024 * 1024) {
-    console.log('✅ 内存波动稳定！波动范围小于 10MB。');
+    console.log('✅ Memory fluctuation stable! Fluctuation range less than 10MB.');
   } else {
-    console.log(`⚠️ 内存波动较大。范围: ${formatMemory(heapMax - heapMin)}`);
+    console.log(`⚠️ Memory fluctuation is large. Range: ${formatMemory(heapMax - heapMin)}`);
   }
 }
 
 /**
- * 主测试流程
+ * Main test flow
  */
 async function runTest() {
-  console.log('🧪 反重力服务内存优化测试');
+  console.log('🧪 Antigravity Service Memory Optimization Test');
   console.log('═'.repeat(50));
-  console.log(`目标: 堆内存保持在 ~20MB`);
-  console.log(`测试时长: ${TEST_DURATION_MS / 1000} 秒`);
-  console.log(`采样间隔: ${SAMPLE_INTERVAL_MS / 1000} 秒`);
+  console.log(`Target: Keep heap memory at ~20MB`);
+  console.log(`Test duration: ${TEST_DURATION_MS / 1000} seconds`);
+  console.log(`Sampling interval: ${SAMPLE_INTERVAL_MS / 1000} seconds`);
   console.log('═'.repeat(50));
   console.log('');
 
   try {
     await startServer();
-    console.log('✅ 服务器已启动\n');
-    
+    console.log('✅ Server started\n');
+
     testStartTime = Date.now();
-    
-    // 设置采样定时器
+
+    // Set up sampling timer
     const sampleInterval = setInterval(collectMemorySample, SAMPLE_INTERVAL_MS);
-    
-    // 设置负载模拟定时器
+
+    // Set up load simulation timer
     const loadInterval = setInterval(simulateLoad, REQUEST_INTERVAL_MS);
-    
-    // 等待测试完成
+
+    // Wait for test to complete
     await new Promise(resolve => setTimeout(resolve, TEST_DURATION_MS));
-    
-    // 清理定时器
+
+    // Clean up timers
     clearInterval(sampleInterval);
     clearInterval(loadInterval);
-    
-    // 最后采集一次
+
+    // Final sample collection
     await collectMemorySample();
-    
-    // 分析结果
+
+    // Analyze results
     analyzeResults();
-    
+
   } catch (error) {
-    console.error('❌ 测试失败:', error.message);
+    console.error('❌ Test failed:', error.message);
   } finally {
     stopServer();
     process.exit(0);
   }
 }
 
-// 处理进程退出
+// Handle process exit
 process.on('SIGINT', () => {
-  console.log('\n收到中断信号...');
+  console.log('\nReceived interrupt signal...');
   stopServer();
   process.exit(0);
 });
@@ -287,5 +289,5 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// 运行测试
+// Run test
 runTest();

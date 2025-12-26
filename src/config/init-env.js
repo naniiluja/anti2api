@@ -11,7 +11,7 @@ const sensitiveKeys = ['API_KEY', 'ADMIN_USERNAME', 'ADMIN_PASSWORD', 'JWT_SECRE
 if (fs.existsSync(envPath)) {
   let envContent = fs.readFileSync(envPath, 'utf8');
   let updated = false;
-  
+
   sensitiveKeys.forEach(key => {
     const value = process.env[key];
     if (value !== undefined && value !== '') {
@@ -24,9 +24,9 @@ if (fs.existsSync(envPath)) {
       updated = true;
     }
   });
-  
+
   if (updated) {
     fs.writeFileSync(envPath, envContent, 'utf8');
-    console.log('✓ 环境变量已同步到 .env');
+    console.log('✓ Environment variables synced to .env');
   }
 }

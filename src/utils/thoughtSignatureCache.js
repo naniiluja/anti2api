@@ -1,18 +1,18 @@
-// 简单内存缓存：按 sessionId + model 维度缓存思维链签名和工具签名
-// 同时集成内存管理器，在压力较高时自动收缩/清空缓存
+// Simple memory cache: cache thought chain signatures and tool signatures by sessionId + model dimension
+// Integrates with memory manager to auto shrink/clear cache under high pressure
 
 import memoryManager, { MemoryPressure } from './memoryManager.js';
 
 const reasoningSignatureCache = new Map();
 const toolSignatureCache = new Map();
 
-// 正常情况下允许的最大条目数（低压力时）
+// Max entries allowed under normal conditions (low pressure)
 const MAX_REASONING_ENTRIES = 256;
 const MAX_TOOL_ENTRIES = 256;
 
-// 过期时间与定时清理间隔（毫秒）
-const ENTRY_TTL_MS = 30 * 60 * 1000;      // 30 分钟
-const CLEAN_INTERVAL_MS = 10 * 60 * 1000; // 每 10 分钟扫一遍
+// Expiration time and cleanup interval (milliseconds)
+const ENTRY_TTL_MS = 30 * 60 * 1000;      // 30 minutes
+const CLEAN_INTERVAL_MS = 10 * 60 * 1000; // Clean every 10 minutes
 
 function makeKey(sessionId, model) {
   return `${sessionId || ''}::${model || ''}`;
@@ -38,24 +38,24 @@ function pruneExpired(map, now) {
   }
 }
 
-// 注册到内存管理器，在不同压力级别下自动清理缓存
+// Register with memory manager to auto cleanup cache at different pressure levels
 memoryManager.registerCleanup((pressure) => {
   if (pressure === MemoryPressure.MEDIUM) {
-    // 中等压力：收缩到一半容量
+    // Medium pressure: shrink to half capacity
     pruneMap(reasoningSignatureCache, Math.floor(MAX_REASONING_ENTRIES / 2));
     pruneMap(toolSignatureCache, Math.floor(MAX_TOOL_ENTRIES / 2));
   } else if (pressure === MemoryPressure.HIGH) {
-    // 高压力：大幅收缩
+    // High pressure: significantly shrink
     pruneMap(reasoningSignatureCache, Math.floor(MAX_REASONING_ENTRIES / 4));
     pruneMap(toolSignatureCache, Math.floor(MAX_TOOL_ENTRIES / 4));
   } else if (pressure === MemoryPressure.CRITICAL) {
-    // 紧急压力：直接清空，优先保活
+    // Critical pressure: clear entirely, prioritize staying alive
     reasoningSignatureCache.clear();
     toolSignatureCache.clear();
   }
 });
 
-// 定时清理：不依赖压力等级，按 TTL 移除过期签名
+// Periodic cleanup: independent of pressure level, remove expired signatures by TTL
 setInterval(() => {
   const now = Date.now();
   pruneExpired(reasoningSignatureCache, now);
@@ -66,7 +66,7 @@ export function setReasoningSignature(sessionId, model, signature) {
   if (!signature) return;
   const key = makeKey(sessionId, model);
   reasoningSignatureCache.set(key, { signature, ts: Date.now() });
-  // 防止在低压力下无限增长
+  // Prevent infinite growth under low pressure
   pruneMap(reasoningSignatureCache, MAX_REASONING_ENTRIES);
 }
 
@@ -101,7 +101,7 @@ export function getToolSignature(sessionId, model) {
   return entry.signature || null;
 }
 
-// 预留：手动清理接口（目前未在外部使用，但方便将来扩展）
+// Reserved: manual cleanup interface (not used externally yet, for future extension)
 export function clearThoughtSignatureCaches() {
   reasoningSignatureCache.clear();
   toolSignatureCache.clear();

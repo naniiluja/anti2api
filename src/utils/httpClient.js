@@ -4,9 +4,9 @@ import http from 'http';
 import https from 'https';
 import config from '../config/config.js';
 
-// ==================== DNS & 代理统一配置 ====================
+// ==================== DNS & Proxy Unified Configuration ====================
 
-// 自定义 DNS 解析：优先 IPv4，失败则回退 IPv6
+// Custom DNS resolution: prefer IPv4, fallback to IPv6 on failure
 function customLookup(hostname, options, callback) {
   dns.lookup(hostname, { ...options, family: 4 }, (err4, address4, family4) => {
     if (!err4 && address4) {
@@ -21,7 +21,7 @@ function customLookup(hostname, options, callback) {
   });
 }
 
-// 使用自定义 DNS 解析的 Agent（优先 IPv4，失败则 IPv6）
+// Agent with custom DNS resolution (prefer IPv4, fallback to IPv6)
 const httpAgent = new http.Agent({
   lookup: customLookup,
   keepAlive: true
@@ -32,7 +32,7 @@ const httpsAgent = new https.Agent({
   keepAlive: true
 });
 
-// 统一构建代理配置
+// Unified proxy configuration builder
 function buildProxyConfig() {
   if (!config.proxy) return false;
   try {
@@ -47,7 +47,7 @@ function buildProxyConfig() {
   }
 }
 
-// 为 axios 构建统一请求配置
+// Build unified request configuration for axios
 export function buildAxiosRequestConfig({ method = 'POST', url, headers, data = null, timeout = config.timeout }) {
   const axiosConfig = {
     method,
@@ -63,13 +63,13 @@ export function buildAxiosRequestConfig({ method = 'POST', url, headers, data = 
   return axiosConfig;
 }
 
-// 简单封装 axios 调用，方便后续统一扩展（重试、打点等）
+// Simple axios wrapper for easy future extensions (retry, logging, etc.)
 export async function httpRequest(configOverrides) {
   const axiosConfig = buildAxiosRequestConfig(configOverrides);
   return axios(axiosConfig);
 }
 
-// 流式请求封装
+// Stream request wrapper
 export async function httpStreamRequest(configOverrides) {
   const axiosConfig = buildAxiosRequestConfig(configOverrides);
   axiosConfig.responseType = 'stream';

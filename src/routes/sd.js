@@ -6,7 +6,7 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// 静态数据
+// Static data
 const SD_MOCK_DATA = {
   options: {
     sd_model_checkpoint: 'gemini-3-pro-image',
@@ -68,14 +68,14 @@ const SD_MOCK_DATA = {
   }
 };
 
-// 构建图片生成请求体
+// Build image generation request body
 function buildImageRequestBody(prompt, token, model = 'gemini-3-pro-image') {
   const messages = [{ role: 'user', content: prompt }];
   const requestBody = generateRequestBody(messages, model, {}, null, token);
   return prepareImageRequest(requestBody);
 }
 
-// GET 路由
+// GET routes
 router.get('/sd-models', async (req, res) => {
   try {
     const models = await getAvailableModels();

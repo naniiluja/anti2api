@@ -3,42 +3,42 @@ import { generateToolCallId } from '../utils/idGenerator.js';
 import { setReasoningSignature, setToolSignature } from '../utils/thoughtSignatureCache.js';
 import { getOriginalToolName } from '../utils/toolNameCache.js';
 
-// 预编译的常量（避免重复创建字符串）
+// Pre-compiled constants (avoid repeated string creation)
 const DATA_PREFIX = 'data: ';
 const DATA_PREFIX_LEN = DATA_PREFIX.length;
 
-// 高效的行分割器（零拷贝，避免 split 创建新数组）
-// 使用对象池复用 LineBuffer 实例
+// Efficient line splitter (zero-copy, avoid split creating new arrays)
+// Uses object pool to reuse LineBuffer instances
 class LineBuffer {
   constructor() {
     this.buffer = '';
     this.lines = [];
   }
-  
-  // 追加数据并返回完整的行
+
+  // Append data and return complete lines
   append(chunk) {
     this.buffer += chunk;
-    this.lines.length = 0; // 重用数组
-    
+    this.lines.length = 0; // Reuse array
+
     let start = 0;
     let end;
     while ((end = this.buffer.indexOf('\n', start)) !== -1) {
       this.lines.push(this.buffer.slice(start, end));
       start = end + 1;
     }
-    
-    // 保留未完成的部分
+
+    // Keep incomplete part
     this.buffer = start < this.buffer.length ? this.buffer.slice(start) : '';
     return this.lines;
   }
-  
+
   clear() {
     this.buffer = '';
     this.lines.length = 0;
   }
 }
 
-// LineBuffer 对象池
+// LineBuffer object pool
 const lineBufferPool = [];
 const getLineBuffer = () => {
   const buffer = lineBufferPool.pop();
@@ -56,7 +56,7 @@ const releaseLineBuffer = (buffer) => {
   }
 };
 
-// toolCall 对象池
+// toolCall object pool
 const toolCallPool = [];
 const getToolCallObject = () => toolCallPool.pop() || { id: '', type: 'function', function: { name: '', arguments: '' } };
 const releaseToolCallObject = (obj) => {
@@ -64,14 +64,14 @@ const releaseToolCallObject = (obj) => {
   if (toolCallPool.length < maxSize) toolCallPool.push(obj);
 };
 
-// 注册内存清理回调（供外部统一调用）
+// Register memory cleanup callback (for unified external calls)
 function registerStreamMemoryCleanup() {
   registerMemoryPoolCleanup(toolCallPool, () => memoryManager.getPoolSizes().toolCall);
   registerMemoryPoolCleanup(lineBufferPool, () => memoryManager.getPoolSizes().lineBuffer);
 }
 
-// 转换 functionCall 为 OpenAI 格式（使用对象池）
-// 会尝试将安全工具名还原为原始工具名
+// Convert functionCall to OpenAI format (using object pool)
+// Will try to restore safe tool name to original tool name
 function convertToToolCall(functionCall, sessionId, model) {
   const toolCall = getToolCallObject();
   toolCall.id = functionCall.id || generateToolCallId();
@@ -85,23 +85,23 @@ function convertToToolCall(functionCall, sessionId, model) {
   return toolCall;
 }
 
-// 解析并发送流式响应片段（会修改 state 并触发 callback）
-// 支持 DeepSeek 格式：思维链内容通过 reasoning_content 字段输出
-// 同时透传 thoughtSignature，方便客户端后续复用
+// Parse and emit streaming response chunks (modifies state and triggers callback)
+// Supports DeepSeek format: chain of thought content via reasoning_content field
+// Also passes through thoughtSignature for client reuse
 function parseAndEmitStreamChunk(line, state, callback) {
   if (!line.startsWith(DATA_PREFIX)) return;
-  
+
   try {
     const data = JSON.parse(line.slice(DATA_PREFIX_LEN));
     const parts = data.response?.candidates?.[0]?.content?.parts;
-    
+
     if (parts) {
       for (const part of parts) {
         if (part.thought === true) {
           if (part.thoughtSignature) {
             state.reasoningSignature = part.thoughtSignature;
             if (state.sessionId && state.model) {
-              //console.log("服务器传入的签名："+state.reasoningSignature);
+              //console.log("Server provided signature:" + state.reasoningSignature);
               setReasoningSignature(state.sessionId, state.model, part.thoughtSignature);
             }
           }
@@ -124,7 +124,7 @@ function parseAndEmitStreamChunk(line, state, callback) {
         }
       }
     }
-    
+
     if (data.response?.candidates?.[0]?.finishReason) {
       if (state.toolCalls.length > 0) {
         callback({ type: 'tool_calls', tool_calls: state.toolCalls });
@@ -143,7 +143,7 @@ function parseAndEmitStreamChunk(line, state, callback) {
       }
     }
   } catch {
-    // 忽略 JSON 解析错误
+    // Ignore JSON parse errors
   }
 }
 

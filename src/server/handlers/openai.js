@@ -106,7 +106,7 @@ export const handleOpenAIRequest = async (req, res) => {
                 writeStreamData(res, createStreamChunk(id, created, model, delta));
               } else if (data.type === 'tool_calls') {
                 hasToolCall = true;
-                // 根据配置决定是否透传工具调用中的签名
+                // Decide whether to pass through tool call signature based on config
                 const toolCallsWithIndex = data.tool_calls.map((toolCall, index) => {
                   if (config.passSignatureToClient) {
                     return { index, ...toolCall };
@@ -149,8 +149,8 @@ export const handleOpenAIRequest = async (req, res) => {
       }
     } else {
       // Non-streaming request: set longer timeout for large model responses
-      req.setTimeout(0); // 禁用请求超时
-      res.setTimeout(0); // 禁用响应超时
+      req.setTimeout(0); // Disable request timeout
+      res.setTimeout(0); // Disable response timeout
 
       const { content, reasoningContent, reasoningSignature, toolCalls, usage } = await with429Retry(
         () => generateAssistantResponseNoStream(requestBody, token),
@@ -166,7 +166,7 @@ export const handleOpenAIRequest = async (req, res) => {
       message.content = content;
 
       if (toolCalls.length > 0) {
-        // 根据配置决定是否透传工具调用中的签名
+        // Decide whether to pass through tool call signature based on config
         if (config.passSignatureToClient) {
           message.tool_calls = toolCalls;
         } else {

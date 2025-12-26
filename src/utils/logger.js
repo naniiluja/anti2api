@@ -8,7 +8,7 @@ const colors = {
 };
 
 function logMessage(level, ...args) {
-  const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
   const color = { info: colors.green, warn: colors.yellow, error: colors.red }[level];
   console.log(`${colors.gray}${timestamp}${colors.reset} ${color}[${level}]${colors.reset}`, ...args);
 }

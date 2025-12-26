@@ -1,4 +1,4 @@
-// OpenAI 格式转换工具
+// OpenAI format conversion utility
 import config from '../../config/config.js';
 import { extractSystemInstruction } from '../utils.js';
 import { convertOpenAIToolsToAntigravity } from '../toolConverter.js';
@@ -17,6 +17,11 @@ import {
   generateGenerationConfig
 } from './common.js';
 
+/**
+ * Extract images and text from OpenAI message content
+ * @param {string|Array} content - OpenAI format message content
+ * @returns {Object} Extracted content { text, images }
+ */
 function extractImagesFromContent(content) {
   const result = { text: '', images: [] };
   if (typeof content === 'string') {
@@ -44,6 +49,14 @@ function extractImagesFromContent(content) {
   return result;
 }
 
+/**
+ * Handle assistant messages
+ * @param {Object} message - OpenAI format message
+ * @param {Array} antigravityMessages - Target message array
+ * @param {boolean} enableThinking - Whether thinking is enabled
+ * @param {string} actualModelName - Actual model name
+ * @param {string} sessionId - Session ID
+ */
 function handleAssistantMessage(message, antigravityMessages, enableThinking, actualModelName, sessionId) {
   const hasToolCalls = message.tool_calls && message.tool_calls.length > 0;
   const hasContent = message.content && message.content.trim() !== '';
@@ -69,11 +82,24 @@ function handleAssistantMessage(message, antigravityMessages, enableThinking, ac
   pushModelMessage({ parts, toolCalls, hasContent }, antigravityMessages);
 }
 
+/**
+ * Handle tool call responses
+ * @param {Object} message - OpenAI format message
+ * @param {Array} antigravityMessages - Target message array
+ */
 function handleToolCall(message, antigravityMessages) {
   const functionName = findFunctionNameById(message.tool_call_id, antigravityMessages);
   pushFunctionResponse(message.tool_call_id, functionName, message.content, antigravityMessages);
 }
 
+/**
+ * Convert OpenAI messages to Antigravity format
+ * @param {Array} openaiMessages - OpenAI format message array
+ * @param {boolean} enableThinking - Whether thinking is enabled
+ * @param {string} actualModelName - Actual model name
+ * @param {string} sessionId - Session ID
+ * @returns {Array} Antigravity format message array
+ */
 function openaiMessageToAntigravity(openaiMessages, enableThinking, actualModelName, sessionId) {
   const antigravityMessages = [];
   for (const message of openaiMessages) {
@@ -86,10 +112,18 @@ function openaiMessageToAntigravity(openaiMessages, enableThinking, actualModelN
       handleToolCall(message, antigravityMessages);
     }
   }
-  //console.log(JSON.stringify(antigravityMessages,null,2));
   return antigravityMessages;
 }
 
+/**
+ * Generate request body for OpenAI format
+ * @param {Array} openaiMessages - OpenAI format messages
+ * @param {string} modelName - User requested model name
+ * @param {Object} parameters - Generation parameters
+ * @param {Array} openaiTools - OpenAI format tool definitions
+ * @param {Object} token - Token object
+ * @returns {Object} Generated request body
+ */
 export function generateRequestBody(openaiMessages, modelName, parameters, openaiTools, token) {
   const enableThinking = isEnableThinking(modelName);
   const actualModelName = modelMapping(modelName);
@@ -99,6 +133,7 @@ export function generateRequestBody(openaiMessages, modelName, parameters, opena
   let startIndex = 0;
   if (config.useContextSystemPrompt) {
     for (let i = 0; i < openaiMessages.length; i++) {
+      // Separate system messages at the start
       if (openaiMessages[i].role === 'system') {
         startIndex = i + 1;
       } else {

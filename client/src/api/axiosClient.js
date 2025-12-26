@@ -12,11 +12,11 @@ axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`; // Hoặc header tùy chỉnh của app hiện tại
-      // App cũ dùng header gì?
-      // Xem public/js/auth.js để check. 
-      // Main.js: headers: { 'Content-Type': 'application/json' } và body content.
-      // Cần check xem auth token gửi đi ntn.
+      config.headers['Authorization'] = `Bearer ${token}`; // Or custom header of the current app
+      // What header did the old app use?
+      // Check public/js/auth.js to verify.
+      // Main.js: headers: { 'Content-Type': 'application/json' } and body content.
+      // Need to check how the auth token is sent.
       // public/js/tokens.js: fetch('/admin/tokens?token=' + authToken) ?
     }
     return config;

@@ -1,10 +1,10 @@
-// 通用工具函数
+// Utility functions
 import config from '../config/config.js';
 import os from 'os';
 import { REASONING_EFFORT_MAP, DEFAULT_STOP_SEQUENCES } from '../constants/index.js';
 import { toGenerationConfig } from './parameterNormalizer.js';
 
-// ==================== 签名常量 ====================
+// ==================== Signature Constants ====================
 const CLAUDE_THOUGHT_SIGNATURE = 'RXNZRENrZ0lDaEFDR0FJcVFMZzVPTmZsd1ZHNmZKK3labDJ0TkNlRzc5QUpzUHV2OW9UZG1yc0JUUGNsUjFBQWhKNWlYcXhlU0dTaEtxeWJ1NUdaM2YvMXByaHJCSnk3OEhsWkxOd1NEREI5Mi8zQXFlYkUvY3RISEJvTXlGVHNzdzRJZXkxUTFkUURJakE3R3AwSXJQeW0xdWxLMVBXcFhuRElPdmJFRFd4LzV2cUZaQTg2NWU1SkM3QnY2dkxwZE43M2dLYkljaThobGR3cXF3S1VMbHE5b3NMdjc3QnNhZm5mbDhlbUd5NmJ6WVRpUnRWcXA0MDJabmZ2Tnl3T2hJd1BBV0l1SUNTdjFTemswZlNmemR0Z2R5eGgxaUJOZHhHNXVhZWhKdWhlUUwza3RDZWVxa2dMNFE0ZjRKWkFnR3pKOHNvaStjZ1pqRXJHT1lyNjJkdkxnUUVoT1E5MjN6bEUwRFd4aXdPU1JOK3VSRWdHZ0FKVkhZcjBKVzhrVTZvaEVaYk1IVkE4aG14ZElGMm9YK1ZxRnFUSGFDZWZEYWNQNTJVOW94VmJ0cFhrNnJUanQ2ZHpadEFMWThXQWs5RFI3bTJTbGova2VraXFzVVBRbFdIaFNUN3diZGpuVkYvdUVoODRWbXQ5WjdtaThtR2JEcTdaTHVOalF0T3hHMVpXbXJmeUpCMExwa0R1SnZDV01qZ3BqTHdsU0R4SUpmeEFoT2JzQlVpRzdLTDYwcUluanZaK1VTcXdjZGhmN0U3ZjgrN0l2ZXczRC9DZUYvdlptQ0JqU2JTcUdYYmFIQmdC';
 const GEMINI_THOUGHT_SIGNATURE = 'EqAHCp0HAXLI2nygRbdzD4Vgzxxi7tbM87zIRkNgPLqTj+Jxv9mY8Q0G87DzbTtvsIFhWB0RZMoEK6ntm5GmUe6ADtxHk4zgHUs/FKqTu8tzUdPRDrKn3KCAtFW4LJqijZoFxNKMyQRmlgPUX4tGYE7pllD77UK6SjCwKhKZoSVZLMiPXP9YFktbida1Q5upXMrzG1t8abPmpFo983T/rgWlNqJp+Fb+bsoH0zuSpmU4cPKO3LIGsxBhvRhM/xydahZD+VpEX7TEJAN58z1RomFyx9u0IR7ukwZr2UyoNA+uj8OChUDFupQsVwbm3XE1UAt22BGvfYIyyZ42fxgOgsFFY+AZ72AOufcmZb/8vIw3uEUgxHczdl+NGLuS4Hsy/AAntdcH9sojSMF3qTf+ZK1FMav23SPxUBtU5T9HCEkKqQWRnMsVGYV1pupFisWo85hRLDTUipxVy9ug1hN8JBYBNmGLf8KtWLhVp7Z11PIAZj3C6HzoVyiVeuiorwNrn0ZaaXNe+y5LHuDF0DNZhrIfnXByq6grLLSAv4fTLeCJvfGzTWWyZDMbVXNx1HgumKq8calP9wv33t0hfEaOlcmfGIyh1J/N+rOGR0WXcuZZP5/VsFR44S2ncpwTPT+MmR0PsjocDenRY5m/X4EXbGGkZ+cfPnWoA64bn3eLeJTwxl9W1ZbmYS6kjpRGUMxExgRNOzWoGISddHCLcQvN7o50K8SF5k97rxiS5q4rqDmqgRPXzQTQnZyoL3dCxScX9cvLSjNCZDcotonDBAWHfkXZ0/EmFiONQcLJdANtAjwoA44Mbn50gubrTsNd7d0Rm/hbNEh/ZceUalV5MMcl6tJtahCJoybQMsnjWuBXl7cXiKmqAvxTDxIaBgQBYAo4FrbV4zQv35zlol+O3YiyjJn/U0oBeO5pEcH1d0vnLgYP71jZVY2FjWRKnDR9aw4JhiuqAa+i0tupkBy+H4/SVwHADFQq6wcsL8qvXlwktJL9MIAoaXDkIssw6gKE9EuGd7bSO9f+sA8CZ0I8LfJ3jcHUsE/3qd4pFrn5RaET56+1p8ZHZDDUQ0p1okApUCCYsC2WuL6O9P4fcg3yitAA/AfUUNjHKANE+ANneQ0efMG7fx9bvI+iLbXgPupApoov24JRkmhHsrJiu9bp+G/pImd2PNv7ArunJ6upl0VAUWtRyLWyGfdl6etGuY8vVJ7JdWEQ8aWzRK3g6e+8YmDtP5DAfw==';
 const CLAUDE_TOOL_SIGNATURE = 'RXVNQkNrZ0lDaEFDR0FJcVFLZGsvMnlyR0VTbmNKMXEyTFIrcWwyY2ozeHhoZHRPb0VOYWJ2VjZMSnE2MlBhcEQrUWdIM3ZWeHBBUG9rbGN1aXhEbXprZTcvcGlkbWRDQWs5MWcrTVNERnRhbWJFOU1vZWZGc1pWSGhvTUxsMXVLUzRoT3BIaWwyeXBJakNYa05EVElMWS9talprdUxvRjFtMmw5dnkrbENhSDNNM3BYNTM0K1lRZ0NaWTQvSUNmOXo4SkhZVzU2Sm1WcTZBcVNRUURBRGVMV1BQRXk1Q0JsS0dCZXlNdHp2NGRJQVlGbDFSMDBXNGhqNHNiSWNKeGY0UGZVQTBIeE1mZjJEYU5BRXdrWUJ4MmNzRFMrZGM1N1hnUlVNblpkZ0hTVHVNaGdod1lBUT09';
@@ -26,7 +26,7 @@ export function getToolSignatureForModel(actualModelName) {
   return CLAUDE_TOOL_SIGNATURE;
 }
 
-// ==================== 工具名称规范化 ====================
+// ==================== Tool Name Normalization ====================
 export function sanitizeToolName(name) {
   if (!name || typeof name !== 'string') return 'tool';
   let cleaned = name.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -36,7 +36,7 @@ export function sanitizeToolName(name) {
   return cleaned;
 }
 
-// ==================== 参数清理 ====================
+// ==================== Parameter Cleaning ====================
 const EXCLUDED_KEYS = new Set([
   '$schema', 'additionalProperties', 'minLength', 'maxLength',
   'minItems', 'maxItems', 'uniqueItems', 'exclusiveMaximum',
@@ -54,7 +54,7 @@ export function cleanParameters(obj) {
   return cleaned;
 }
 
-// ==================== 模型映射 ====================
+// ==================== Model Mapping ====================
 export function modelMapping(modelName) {
   if (modelName === 'claude-sonnet-4-5-thinking') return 'claude-sonnet-4-5';
   if (modelName === 'claude-opus-4-5') return 'claude-opus-4-5-thinking';
@@ -70,9 +70,9 @@ export function isEnableThinking(modelName) {
     modelName === 'gpt-oss-120b-medium';
 }
 
-// ==================== 生成配置 ====================
+// ==================== Generation Config ====================
 export function generateGenerationConfig(parameters, enableThinking, actualModelName) {
-  // 使用 config.defaults 兜底
+  // Use config.defaults as fallback
   const normalizedParams = {
     temperature: parameters.temperature ?? config.defaults.temperature,
     top_p: parameters.top_p ?? config.defaults.top_p,
@@ -81,22 +81,22 @@ export function generateGenerationConfig(parameters, enableThinking, actualModel
     thinking_budget: parameters.thinking_budget,
   };
 
-  // 处理 reasoning_effort 到 thinking_budget 的转换
+  // Handle reasoning_effort to thinking_budget conversion
   if (normalizedParams.thinking_budget === undefined && parameters.reasoning_effort !== undefined) {
     const defaultThinkingBudget = config.defaults.thinking_budget ?? 1024;
     normalizedParams.thinking_budget = REASONING_EFFORT_MAP[parameters.reasoning_effort] ?? defaultThinkingBudget;
   }
 
-  // 使用统一的参数转换函数
+  // Use unified parameter conversion function
   const generationConfig = toGenerationConfig(normalizedParams, enableThinking, actualModelName);
-  
-  // 添加 stopSequences
+
+  // Add stopSequences
   generationConfig.stopSequences = DEFAULT_STOP_SEQUENCES;
-  
+
   return generationConfig;
 }
 
-// ==================== System 指令提取 ====================
+// ==================== System Instruction Extraction ====================
 export function extractSystemInstruction(openaiMessages) {
   const baseSystem = config.systemInstruction || '';
   if (!config.useContextSystemPrompt) return baseSystem;
@@ -107,8 +107,8 @@ export function extractSystemInstruction(openaiMessages) {
       const content = typeof message.content === 'string'
         ? message.content
         : (Array.isArray(message.content)
-            ? message.content.filter(item => item.type === 'text').map(item => item.text).join('')
-            : '');
+          ? message.content.filter(item => item.type === 'text').map(item => item.text).join('')
+          : '');
       if (content.trim()) systemTexts.push(content.trim());
     } else {
       break;
@@ -121,21 +121,21 @@ export function extractSystemInstruction(openaiMessages) {
   return parts.join('\n\n');
 }
 
-// ==================== 图片请求准备 ====================
+// ==================== Image Request Preparation ====================
 export function prepareImageRequest(requestBody) {
   if (!requestBody || !requestBody.request) return requestBody;
   let imageSize = "1K";
-  if (requestBody.model.includes('4K')){
+  if (requestBody.model.includes('4K')) {
     imageSize = "4K";
-  } else if (requestBody.model.includes('2K')){
+  } else if (requestBody.model.includes('2K')) {
     imageSize = "2K";
   } else {
     imageSize = "1K";
   }
-  if (imageSize !== "1K"){
+  if (imageSize !== "1K") {
     requestBody.model = requestBody.model.slice(0, -3);
   }
-  requestBody.request.generationConfig = { 
+  requestBody.request.generationConfig = {
     candidateCount: 1,
     imageConfig: {
       imageSize: imageSize
@@ -148,7 +148,7 @@ export function prepareImageRequest(requestBody) {
   return requestBody;
 }
 
-// ==================== 其他工具 ====================
+// ==================== Other Utilities ====================
 export function getDefaultIp() {
   const interfaces = os.networkInterfaces();
   if (interfaces.WLAN) {
@@ -167,7 +167,7 @@ export function getDefaultIp() {
   return '127.0.0.1';
 }
 
-// 重导出主要函数
+// Re-export main functions
 export { generateRequestId } from './idGenerator.js';
 export { generateRequestBody } from './converters/openai.js';
 export { generateClaudeRequestBody } from './converters/claude.js';

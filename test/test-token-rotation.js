@@ -1,43 +1,43 @@
 import tokenManager from '../src/auth/token_manager.js';
 
 async function testTokenRotation() {
-  console.log('=== 开始测试 Token 轮询 ===\n');
-  
+  console.log('=== Starting Token Rotation Test ===\n');
+
   const totalTests = 10;
   const usedTokens = new Map();
-  
-  console.log(`初始状态: ${tokenManager.tokens.length} 个可用账号\n`);
-  
+
+  console.log(`Initial state: ${tokenManager.tokens.length} available accounts\n`);
+
   for (let i = 1; i <= totalTests; i++) {
-    console.log(`--- 第 ${i} 次请求 ---`);
-    
+    console.log(`--- Request ${i} ---`);
+
     const token = await tokenManager.getToken();
-    
+
     if (!token) {
-      console.log('❌ 无可用 token\n');
+      console.log('❌ No available token\n');
       break;
     }
-    
+
     const tokenId = token.refresh_token.slice(-8);
-    console.log(`✓ 获取到 token: ...${tokenId}`);
-    console.log(`  当前索引: ${tokenManager.currentIndex}`);
-    console.log(`  剩余账号: ${tokenManager.tokens.length}\n`);
-    
+    console.log(`✓ Got token: ...${tokenId}`);
+    console.log(`  Current index: ${tokenManager.currentIndex}`);
+    console.log(`  Remaining accounts: ${tokenManager.tokens.length}\n`);
+
     usedTokens.set(tokenId, (usedTokens.get(tokenId) || 0) + 1);
   }
-  
-  console.log('=== 轮询统计 ===');
-  console.log(`总请求次数: ${totalTests}`);
-  console.log(`使用的不同账号数: ${usedTokens.size}`);
-  console.log('\n各账号使用次数:');
+
+  console.log('=== Rotation Statistics ===');
+  console.log(`Total requests: ${totalTests}`);
+  console.log(`Different accounts used: ${usedTokens.size}`);
+  console.log('\nUsage count per account:');
   usedTokens.forEach((count, tokenId) => {
-    console.log(`  ...${tokenId}: ${count} 次`);
+    console.log(`  ...${tokenId}: ${count} times`);
   });
-  
+
   if (usedTokens.size === tokenManager.tokens.length) {
-    console.log('\n✅ 所有账号都被正确轮换使用');
+    console.log('\n✅ All accounts were correctly rotated');
   } else {
-    console.log('\n⚠️  部分账号未被使用');
+    console.log('\n⚠️ Some accounts were not used');
   }
 }
 

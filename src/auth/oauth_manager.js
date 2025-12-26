@@ -13,7 +13,7 @@ class OAuthManager {
   }
 
   /**
-   * 生成授权URL
+   * Generate authorization URL
    */
   generateAuthUrl(port) {
     const params = new URLSearchParams({
@@ -29,7 +29,7 @@ class OAuthManager {
   }
 
   /**
-   * 交换授权码获取Token
+   * Exchange authorization code for token
    */
   async exchangeCodeForToken(code, port) {
     const postData = new URLSearchParams({
@@ -39,7 +39,7 @@ class OAuthManager {
       redirect_uri: `http://localhost:${port}/oauth-callback`,
       grant_type: 'authorization_code'
     });
-    
+
     const response = await axios(buildAxiosRequestConfig({
       method: 'POST',
       url: OAUTH_CONFIG.TOKEN_URL,
@@ -47,12 +47,12 @@ class OAuthManager {
       data: postData.toString(),
       timeout: config.timeout
     }));
-    
+
     return response.data;
   }
 
   /**
-   * 获取用户邮箱
+   * Get user email
    */
   async fetchUserEmail(accessToken) {
     try {
@@ -69,54 +69,54 @@ class OAuthManager {
       }));
       return response.data?.email;
     } catch (err) {
-      log.warn('获取用户邮箱失败:', err.message);
+      log.warn('Failed to get user email:', err.message);
       return null;
     }
   }
 
   /**
-   * 资格校验：尝试获取projectId，失败则自动回退到随机projectId
+   * Eligibility check: try to get projectId, fallback to random projectId on failure
    */
   async validateAndGetProjectId(accessToken) {
-    // 如果配置跳过API验证，直接返回随机projectId
+    // If config skips API validation, return random projectId directly
     if (config.skipProjectIdFetch) {
       const projectId = generateProjectId();
-      log.info('已跳过API验证，使用随机生成的projectId: ' + projectId);
+      log.info('Skipped API validation, using randomly generated projectId: ' + projectId);
       return { projectId, hasQuota: true };
     }
 
-    // 尝试从API获取projectId
+    // Try to get projectId from API
     try {
-      log.info('正在验证账号资格...');
+      log.info('Validating account eligibility...');
       const projectId = await tokenManager.fetchProjectId({ access_token: accessToken });
-      
+
       if (projectId === undefined) {
-        // 无资格，自动回退到随机projectId
+        // Not eligible, fallback to random projectId
         const randomProjectId = generateProjectId();
-        log.warn('该账号无资格使用，已自动退回无资格模式，使用随机projectId: ' + randomProjectId);
+        log.warn('This account is not eligible, auto fallback to ineligible mode, using random projectId: ' + randomProjectId);
         return { projectId: randomProjectId, hasQuota: false };
       }
-      
-      log.info('账号验证通过，projectId: ' + projectId);
+
+      log.info('Account validation passed, projectId: ' + projectId);
       return { projectId, hasQuota: true };
     } catch (err) {
-      // 获取失败时也退回到随机projectId
+      // On failure, also fallback to random projectId
       const randomProjectId = generateProjectId();
-      log.warn('验证账号资格失败: ' + err.message + '，已自动退回无资格模式');
-      log.info('使用随机生成的projectId: ' + randomProjectId);
+      log.warn('Failed to validate account eligibility: ' + err.message + ', auto fallback to ineligible mode');
+      log.info('Using randomly generated projectId: ' + randomProjectId);
       return { projectId: randomProjectId, hasQuota: false };
     }
   }
 
   /**
-   * 完整的OAuth认证流程：交换Token -> 获取邮箱 -> 资格校验
+   * Complete OAuth authentication flow: Exchange Token -> Get Email -> Eligibility Check
    */
   async authenticate(code, port) {
-    // 1. 交换授权码获取Token
+    // 1. Exchange authorization code for token
     const tokenData = await this.exchangeCodeForToken(code, port);
-    
+
     if (!tokenData.access_token) {
-      throw new Error('Token交换失败：未获取到access_token');
+      throw new Error('Token exchange failed: access_token not obtained');
     }
 
     const account = {
@@ -126,14 +126,14 @@ class OAuthManager {
       timestamp: Date.now()
     };
 
-    // 2. 获取用户邮箱
+    // 2. Get user email
     const email = await this.fetchUserEmail(account.access_token);
     if (email) {
       account.email = email;
-      log.info('获取到用户邮箱: ' + email);
+      log.info('Got user email: ' + email);
     }
 
-    // 3. 资格校验并获取projectId
+    // 3. Eligibility check and get projectId
     const { projectId, hasQuota } = await this.validateAndGetProjectId(account.access_token);
     account.projectId = projectId;
     account.hasQuota = hasQuota;

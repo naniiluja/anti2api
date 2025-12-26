@@ -1,4 +1,4 @@
-// Claude 格式转换工具
+// Claude format conversion utility
 import config from '../../config/config.js';
 import { convertClaudeToolsToAntigravity } from '../toolConverter.js';
 import {
@@ -17,6 +17,11 @@ import {
   generateGenerationConfig
 } from './common.js';
 
+/**
+ * Extract images from Claude message content
+ * @param {string|Array} content - Claude format message content
+ * @returns {Object} Extracted content { text, images }
+ */
 function extractImagesFromClaudeContent(content) {
   const result = { text: '', images: [] };
   if (typeof content === 'string') {
@@ -43,6 +48,14 @@ function extractImagesFromClaudeContent(content) {
   return result;
 }
 
+/**
+ * Handle assistant messages in Claude format
+ * @param {Object} message - Claude format message
+ * @param {Array} antigravityMessages - Target message array
+ * @param {boolean} enableThinking - Whether thinking is enabled
+ * @param {string} actualModelName - Actual model name
+ * @param {string} sessionId - Session ID
+ */
 function handleClaudeAssistantMessage(message, antigravityMessages, enableThinking, actualModelName, sessionId) {
   const content = message.content;
   const { reasoningSignature, toolSignature } = getSignatureContext(sessionId, actualModelName);
@@ -66,7 +79,7 @@ function handleClaudeAssistantMessage(message, antigravityMessages, enableThinki
 
   const hasContent = textContent && textContent.trim() !== '';
   const parts = [];
-  
+
   if (enableThinking) {
     parts.push(createThoughtPart(' '));
   }
@@ -76,6 +89,11 @@ function handleClaudeAssistantMessage(message, antigravityMessages, enableThinki
   pushModelMessage({ parts, toolCalls, hasContent }, antigravityMessages);
 }
 
+/**
+ * Handle tool result messages in Claude format
+ * @param {Object} message - Claude format message
+ * @param {Array} antigravityMessages - Target message array
+ */
 function handleClaudeToolResult(message, antigravityMessages) {
   const content = message.content;
   if (!Array.isArray(content)) return;
@@ -97,6 +115,14 @@ function handleClaudeToolResult(message, antigravityMessages) {
   }
 }
 
+/**
+ * Convert Claude messages to Antigravity format
+ * @param {Array} claudeMessages - Claude format messages
+ * @param {boolean} enableThinking - Whether thinking is enabled
+ * @param {string} actualModelName - Actual model name
+ * @param {string} sessionId - Session ID
+ * @returns {Array} Antigravity format message array
+ */
 function claudeMessageToAntigravity(claudeMessages, enableThinking, actualModelName, sessionId) {
   const antigravityMessages = [];
   for (const message of claudeMessages) {
@@ -115,6 +141,16 @@ function claudeMessageToAntigravity(claudeMessages, enableThinking, actualModelN
   return antigravityMessages;
 }
 
+/**
+ * Generate request body for Claude format
+ * @param {Array} claudeMessages - Claude format messages
+ * @param {string} modelName - User requested model name
+ * @param {Object} parameters - Generation parameters
+ * @param {Array} claudeTools - Claude format tool definitions
+ * @param {string} systemPrompt - System prompt
+ * @param {Object} token - Token object
+ * @returns {Object} Generated request body
+ */
 export function generateClaudeRequestBody(claudeMessages, modelName, parameters, claudeTools, systemPrompt, token) {
   const enableThinking = isEnableThinking(modelName);
   const actualModelName = modelMapping(modelName);

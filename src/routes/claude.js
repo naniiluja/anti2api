@@ -1,6 +1,6 @@
 /**
- * Claude API 路由
- * 处理 /v1/messages 端点
+ * Claude API routes
+ * Handle /v1/messages endpoint
  */
 
 import { Router } from 'express';
@@ -10,7 +10,7 @@ const router = Router();
 
 /**
  * POST /v1/messages
- * 处理 Claude 消息请求
+ * Handle Claude message requests
  */
 router.post('/messages', (req, res) => {
   const isStream = req.body.stream === true;

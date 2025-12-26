@@ -6,11 +6,11 @@ import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// 检测是否在 pkg 打包环境中运行
+// Check if running in pkg packaged environment
 const isPkg = typeof process.pkg !== 'undefined';
 
-// 缓冲区大小警告阈值（不限制，只警告）
-const BUFFER_WARNING_SIZE = 50 * 1024 * 1024; // 50MB 警告
+// Buffer size warning threshold (no limit, just warning)
+const BUFFER_WARNING_SIZE = 50 * 1024 * 1024; // 50MB warning
 
 class antigravityRequester {
     constructor(options = {}) {
@@ -27,7 +27,7 @@ class antigravityRequester {
     _getExecutablePath() {
         const platform = os.platform();
         const arch = os.arch();
-        
+
         let filename;
         if (platform === 'win32' && arch === "x64") {
             filename = 'antigravity_requester_windows_amd64.exe';
@@ -41,41 +41,41 @@ class antigravityRequester {
         } else {
             throw new Error(`Unsupported platform: ${platform}+${arch}`);
         }
-        
-        // 获取 bin 目录路径
-        // pkg 环境下优先使用可执行文件旁边的 bin 目录
+
+        // Get bin directory path
+        // In pkg environment, prioritize the bin directory next to the executable
         let binPath = this.binPath;
         if (!binPath) {
             if (isPkg) {
-                // pkg 环境：优先使用可执行文件旁边的 bin 目录
+                // pkg environment: prioritize bin directory next to the executable
                 const exeDir = path.dirname(process.execPath);
                 const exeBinDir = path.join(exeDir, 'bin');
                 if (fs.existsSync(exeBinDir)) {
                     binPath = exeBinDir;
                 } else {
-                    // 其次使用当前工作目录的 bin 目录
+                    // Secondly, use bin directory in current working directory
                     const cwdBinDir = path.join(process.cwd(), 'bin');
                     if (fs.existsSync(cwdBinDir)) {
                         binPath = cwdBinDir;
                     } else {
-                        // 最后使用打包内的 bin 目录
+                        // Finally, use bin directory inside the package
                         binPath = path.join(__dirname, 'bin');
                     }
                 }
             } else {
-                // 开发环境
+                // Development environment
                 binPath = path.join(__dirname, 'bin');
             }
         }
-        
+
         const requester_execPath = path.join(binPath, filename);
-        
-        // 检查文件是否存在
+
+        // Check if file exists
         if (!fs.existsSync(requester_execPath)) {
             console.warn(`Binary not found at: ${requester_execPath}`);
         }
-        
-        // 设置执行权限（非Windows平台）
+
+        // Set execution permissions (non-Windows platforms)
         if (platform !== 'win32') {
             try {
                 fs.chmodSync(requester_execPath, 0o755);
@@ -93,40 +93,40 @@ class antigravityRequester {
             stdio: ['pipe', 'pipe', 'pipe']
         });
 
-        // 设置 stdin 为非阻塞模式
+        // Set stdin to non-blocking mode
         if (this.proc.stdin.setDefaultEncoding) {
             this.proc.stdin.setDefaultEncoding('utf8');
         }
 
-        // 增大 stdout 缓冲区以减少背压
+        // Increase stdout buffer to reduce backpressure
         if (this.proc.stdout.setEncoding) {
             this.proc.stdout.setEncoding('utf8');
         }
-        
-        // 使用 setImmediate 异步处理数据,避免阻塞
+
+        // Use setImmediate to process data asynchronously, avoid blocking
         this.proc.stdout.on('data', (data) => {
             const chunk = data.toString();
-            
-            // 缓冲区大小监控（仅警告，不限制，因为图片响应可能很大）
+
+            // Buffer size monitoring (warning only, no limit, image responses can be large)
             if (!this.bufferWarned && this.buffer.length > BUFFER_WARNING_SIZE) {
-                console.warn(`AntigravityRequester: 缓冲区较大 (${Math.round(this.buffer.length / 1024 / 1024)}MB)，可能有大型响应`);
+                console.warn(`AntigravityRequester: Large buffer (${Math.round(this.buffer.length / 1024 / 1024)}MB), possibly a large response`);
                 this.bufferWarned = true;
             }
-            
+
             this.buffer += chunk;
-            
-            // 使用 setImmediate 异步处理,避免阻塞 stdout 读取
+
+            // Use setImmediate to process asynchronously, avoid blocking stdout reading
             setImmediate(() => {
                 let start = 0;
                 let end;
-                
-                // 高效的行分割（避免 split 创建大量字符串）
+
+                // Efficient line splitting (avoid creating many strings with split)
                 while ((end = this.buffer.indexOf('\n', start)) !== -1) {
                     const line = this.buffer.slice(start, end).trim();
                     start = end + 1;
-                    
+
                     if (!line) continue;
-                    
+
                     try {
                         const response = JSON.parse(line);
                         const pending = this.pendingRequests.get(response.id);
@@ -146,11 +146,11 @@ class antigravityRequester {
                             }
                         }
                     } catch (e) {
-                        // 忽略 JSON 解析错误（可能是不完整的行）
+                        // Ignore JSON parsing errors (possibly incomplete line)
                     }
                 }
-                
-                // 保留未处理的部分
+
+                // Keep unprocessed part
                 this.buffer = start < this.buffer.length ? this.buffer.slice(start) : '';
                 this.bufferWarned = false;
             });
@@ -214,7 +214,7 @@ class antigravityRequester {
         const streamResponse = new StreamResponse(id);
         this.pendingRequests.set(id, { streamResponse });
         this._writeRequest(request);
-        
+
         return streamResponse;
     }
 
@@ -226,7 +226,7 @@ class antigravityRequester {
                 if (canWrite) {
                     resolve();
                 } else {
-                    // 等待 drain 事件，并在任一事件触发后移除另一个监听器
+                    // Wait for drain event and remove the other listener when either is triggered
                     const onDrain = () => {
                         this.proc.stdin.removeListener('error', onError);
                         resolve();
@@ -246,7 +246,7 @@ class antigravityRequester {
 
     close() {
         if (this.proc) {
-            // 先拒绝所有待处理的请求
+            // Reject all pending requests
             for (const [id, pending] of this.pendingRequests) {
                 if (pending.reject) {
                     pending.reject(new Error('Requester closed'));
@@ -255,37 +255,37 @@ class antigravityRequester {
                 }
             }
             this.pendingRequests.clear();
-            
-            // 清理缓冲区
+
+            // Clear buffer
             this.buffer = '';
-            
+
             const proc = this.proc;
             this.proc = null;
-            
-            // 关闭输入流
+
+            // Close stdin
             try {
                 proc.stdin.end();
             } catch (e) {
-                // 忽略关闭错误
+                // Ignore closing error
             }
-            
-            // 立即发送 SIGTERM 终止子进程，不使用 setTimeout
-            // 这样可以确保在主进程退出前子进程被正确终止
+
+            // Send SIGTERM immediately to terminate sub-process, do not use setTimeout
+            // This ensures sub-process is terminated before main process exits
             try {
                 if (proc && !proc.killed) {
                     proc.kill('SIGTERM');
                 }
             } catch (e) {
-                // 忽略错误
+                // Ignore error
             }
-            
-            // 如果 SIGTERM 无效，立即使用 SIGKILL
+
+            // If SIGTERM is ineffective, use SIGKILL immediately
             try {
                 if (proc && !proc.killed) {
                     proc.kill('SIGKILL');
                 }
             } catch (e) {
-                // 忽略错误
+                // Ignore error
             }
         }
     }
@@ -314,7 +314,7 @@ class StreamResponse {
             this.headers = new Map(Object.entries(chunk.headers || {}));
             if (this._onStart) this._onStart({ status: chunk.status, headers: this.headers });
         } else if (chunk.type === 'data') {
-            const data = chunk.encoding === 'base64' 
+            const data = chunk.encoding === 'base64'
                 ? Buffer.from(chunk.data, 'base64').toString('utf8')
                 : chunk.data;
             this.chunks.push(data);

@@ -1,6 +1,6 @@
 /**
- * Google OAuth 配置
- * 统一管理，避免在多个文件中重复定义和硬编码
+ * Google OAuth Configuration
+ * Unified management to avoid duplicate definitions and hardcoding across multiple files
  */
 export const OAUTH_CONFIG = {
   CLIENT_ID: '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com',
@@ -9,7 +9,7 @@ export const OAUTH_CONFIG = {
   AUTH_URL: 'https://accounts.google.com/o/oauth2/v2/auth'
 };
 
-// 服务器端使用的默认 OAuth Scope 列表
+// Default OAuth Scope list used by the server side
 export const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/cloud-platform',
   'https://www.googleapis.com/auth/userinfo.email',

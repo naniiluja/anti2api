@@ -1,6 +1,6 @@
 /**
- * 服务器主入口
- * Express 应用配置、中间件、路由挂载、服务器启动和关闭
+ * Server main entry
+ * Express application configuration, middleware, route mounting, server startup and shutdown
  */
 
 import express from 'express';
@@ -15,7 +15,7 @@ import { MEMORY_CHECK_INTERVAL } from '../constants/index.js';
 import { errorHandler } from '../utils/errors.js';
 import { getChunkPoolSize, clearChunkPool } from './stream.js';
 
-// 路由模块
+// Route modules
 import adminRouter from '../routes/admin.js';
 import sdRouter from '../routes/sd.js';
 import openaiRouter from '../routes/openai.js';
@@ -24,29 +24,29 @@ import claudeRouter from '../routes/claude.js';
 
 const publicDir = getPublicDir();
 
-logger.info(`静态文件目录: ${getRelativePath(publicDir)}`);
+logger.info(`Static file directory: ${getRelativePath(publicDir)}`);
 
 const app = express();
 
-// ==================== 内存管理 ====================
+// ==================== Memory Management ====================
 memoryManager.setThreshold(config.server.memoryThreshold);
 memoryManager.start(MEMORY_CHECK_INTERVAL);
 
-// ==================== 基础中间件 ====================
+// ==================== Base Middleware ====================
 app.use(cors());
 app.use(express.json({ limit: config.security.maxRequestSize }));
 
-// 静态文件服务
+// Static file serving
 app.use('/images', express.static(path.join(publicDir, 'images')));
 app.use(express.static(publicDir));
 
-// 管理路由
+// Admin routes
 app.use('/admin', adminRouter);
 
-// 使用统一错误处理中间件
+// Use unified error handling middleware
 app.use(errorHandler);
 
-// ==================== 请求日志中间件 ====================
+// ==================== Request Logging Middleware ====================
 app.use((req, res, next) => {
   const ignorePaths = [
     '/images', '/favicon.ico', '/.well-known',
@@ -54,7 +54,7 @@ app.use((req, res, next) => {
     '/sdapi/v1/upscalers', '/sdapi/v1/latent-upscale-modes',
     '/sdapi/v1/sd-vae', '/sdapi/v1/sd-modules'
   ];
-  // 提前获取完整路径，避免在路由处理后 req.path 被修改为相对路径
+  // Get full path early to avoid req.path being modified to relative path after route handling
   const fullPath = req.originalUrl.split('?')[0];
   if (!ignorePaths.some(p => fullPath.startsWith(p))) {
     const start = Date.now();
@@ -65,10 +65,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// SD API 路由
+// SD API routes
 app.use('/sdapi/v1', sdRouter);
 
-// ==================== API Key 验证中间件 ====================
+// ==================== API Key Validation Middleware ====================
 app.use((req, res, next) => {
   if (req.path.startsWith('/v1/')) {
     const apiKey = config.security?.apiKey;
@@ -76,7 +76,7 @@ app.use((req, res, next) => {
       const authHeader = req.headers.authorization || req.headers['x-api-key'];
       const providedKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
       if (providedKey !== apiKey) {
-        logger.warn(`API Key 验证失败: ${req.method} ${req.path} (提供的Key: ${providedKey ? providedKey.substring(0, 10) + '...' : '无'})`);
+        logger.warn(`API Key validation failed: ${req.method} ${req.path} (Provided Key: ${providedKey ? providedKey.substring(0, 10) + '...' : 'none'})`);
         return res.status(401).json({ error: 'Invalid API Key' });
       }
     }
@@ -85,7 +85,7 @@ app.use((req, res, next) => {
     if (apiKey) {
       const providedKey = req.query.key || req.headers['x-goog-api-key'];
       if (providedKey !== apiKey) {
-        logger.warn(`API Key 验证失败: ${req.method} ${req.path} (提供的Key: ${providedKey ? providedKey.substring(0, 10) + '...' : '无'})`);
+        logger.warn(`API Key validation failed: ${req.method} ${req.path} (Provided Key: ${providedKey ? providedKey.substring(0, 10) + '...' : 'none'})`);
         return res.status(401).json({ error: 'Invalid API Key' });
       }
     }
@@ -93,20 +93,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// ==================== API 路由 ====================
+// ==================== API Routes ====================
 
-// OpenAI 兼容 API
+// OpenAI compatible API
 app.use('/v1', openaiRouter);
 
-// Gemini 兼容 API
+// Gemini compatible API
 app.use('/v1beta', geminiRouter);
 
-// Claude 兼容 API（/v1/messages 由 claudeRouter 处理）
+// Claude compatible API (/v1/messages handled by claudeRouter)
 app.use('/v1', claudeRouter);
 
-// ==================== 系统端点 ====================
+// ==================== System Endpoints ====================
 
-// 内存监控端点
+// Memory monitoring endpoint
 app.get('/v1/memory', (req, res) => {
   const usage = process.memoryUsage();
   res.json({
@@ -121,53 +121,53 @@ app.get('/v1/memory', (req, res) => {
   });
 });
 
-// 健康检查端点
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
-// ==================== 服务器启动 ====================
+// ==================== Server Startup ====================
 const server = app.listen(config.server.port, config.server.host, () => {
-  logger.info(`服务器已启动: ${config.server.host}:${config.server.port}`);
+  logger.info(`Server started: ${config.server.host}:${config.server.port}`);
 });
 
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
-    logger.error(`端口 ${config.server.port} 已被占用`);
+    logger.error(`Port ${config.server.port} is already in use`);
     process.exit(1);
   } else if (error.code === 'EACCES') {
-    logger.error(`端口 ${config.server.port} 无权限访问`);
+    logger.error(`No permission to access port ${config.server.port}`);
     process.exit(1);
   } else {
-    logger.error('服务器启动失败:', error.message);
+    logger.error('Server startup failed:', error.message);
     process.exit(1);
   }
 });
 
-// ==================== 优雅关闭 ====================
+// ==================== Graceful Shutdown ====================
 const shutdown = () => {
-  logger.info('正在关闭服务器...');
+  logger.info('Shutting down server...');
 
-  // 停止内存管理器
+  // Stop memory manager
   memoryManager.stop();
-  logger.info('已停止内存管理器');
+  logger.info('Memory manager stopped');
 
-  // 关闭子进程请求器
+  // Close subprocess requester
   closeRequester();
-  logger.info('已关闭子进程请求器');
+  logger.info('Subprocess requester closed');
 
-  // 清理对象池
+  // Clear object pools
   clearChunkPool();
-  logger.info('已清理对象池');
+  logger.info('Object pools cleared');
 
   server.close(() => {
-    logger.info('服务器已关闭');
+    logger.info('Server closed');
     process.exit(0);
   });
 
-  // 5秒超时强制退出
+  // 5 second timeout for forced exit
   setTimeout(() => {
-    logger.warn('服务器关闭超时，强制退出');
+    logger.warn('Server shutdown timeout, forcing exit');
     process.exit(0);
   }, 5000);
 };
@@ -175,12 +175,12 @@ const shutdown = () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// ==================== 异常处理 ====================
+// ==================== Exception Handling ====================
 process.on('uncaughtException', (error) => {
-  logger.error('未捕获异常:', error.message);
-  // 不立即退出，让当前请求完成
+  logger.error('Uncaught exception:', error.message);
+  // Don't exit immediately, let current requests complete
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('未处理的 Promise 拒绝:', reason);
+  logger.error('Unhandled Promise rejection:', reason);
 });

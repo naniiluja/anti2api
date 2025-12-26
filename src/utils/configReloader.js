@@ -1,7 +1,7 @@
 import config, { getConfigJson, buildConfig } from '../config/config.js';
 
 /**
- * 重新加载配置到 config 对象
+ * Reload configuration into the config object
  */
 export function reloadConfig() {
   const newConfig = buildConfig(getConfigJson());

@@ -10,11 +10,11 @@ const ACCOUNTS_FILE = path.join(__dirname, '..', 'data', 'accounts.json');
 async function refreshAllTokens() {
   const tokens = tokenManager.getTokenList();
   if (!tokens || tokens.length === 0) {
-    log.warn('未找到可刷新账号');
+    log.warn('No accounts found to refresh');
     return;
   }
 
-  log.info(`找到 ${tokens.length} 个账号`);
+  log.info(`Found ${tokens.length} accounts`);
 
   let successCount = 0;
   let failCount = 0;
@@ -23,33 +23,33 @@ async function refreshAllTokens() {
     const token = tokens[i];
 
     if (token.enable === false) {
-      log.warn(`账号 ${i + 1}: 已禁用，跳过`);
+      log.warn(`Account ${i + 1}: Disabled, skipping`);
       continue;
     }
 
     try {
-      log.info(`刷新账号 ${i + 1}...`);
+      log.info(`Refreshing account ${i + 1}...`);
       await tokenManager.refreshToken(token);
       successCount++;
-      log.info(`账号 ${i + 1}: 刷新成功`);
+      log.info(`Account ${i + 1}: Refresh successful`);
     } catch (error) {
       failCount++;
       const statusCode = error.statusCode;
-      log.error(`账号 ${i + 1}: 刷新失败 - ${error.message}`);
+      log.error(`Account ${i + 1}: Refresh failed - ${error.message}`);
 
-      // 对于 400/403 之类错误，统一禁用该账号，行为与运行时一致
+      // For 400/403 errors, disable the account, consistent with runtime behavior
       if (statusCode === 400 || statusCode === 403) {
         tokenManager.disableToken(token);
-        log.warn(`账号 ${i + 1}: Token 已失效或错误，已自动禁用该账号`);
+        log.warn(`Account ${i + 1}: Token expired or invalid, auto-disabled account`);
       }
     }
   }
 
-  log.info(`刷新完成: 成功 ${successCount} 个, 失败 ${failCount} 个`);
-  log.info(`账号文件路径: ${ACCOUNTS_FILE}`);
+  log.info(`Refresh completed: ${successCount} successful, ${failCount} failed`);
+  log.info(`Accounts file path: ${ACCOUNTS_FILE}`);
 }
 
 refreshAllTokens().catch(err => {
-  log.error('刷新失败:', err.message);
+  log.error('Refresh failed:', err.message);
   process.exit(1);
 });

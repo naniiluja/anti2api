@@ -17,11 +17,11 @@ const envPath = getEnvPath();
 
 const router = express.Router();
 
-// 登录速率限制 - 防止暴力破解
+// Login rate limiting - prevent brute force
 const loginAttempts = new Map(); // IP -> { count, lastAttempt, blockedUntil }
 const MAX_LOGIN_ATTEMPTS = 5;
-const BLOCK_DURATION = 5 * 60 * 1000; // 5分钟
-const ATTEMPT_WINDOW = 15 * 60 * 1000; // 15分钟窗口
+const BLOCK_DURATION = 5 * 60 * 1000; // 5 minutes
+const ATTEMPT_WINDOW = 15 * 60 * 1000; // 15 minute window
 
 function getClientIP(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
@@ -37,17 +37,17 @@ function checkLoginRateLimit(ip) {
 
   if (!attempt) return { allowed: true };
 
-  // 检查是否被封禁
+  // Check if blocked
   if (attempt.blockedUntil && now < attempt.blockedUntil) {
     const remainingSeconds = Math.ceil((attempt.blockedUntil - now) / 1000);
     return {
       allowed: false,
-      message: `登录尝试过多，请 ${remainingSeconds} 秒后重试`,
+      message: `Too many login attempts, please try again in ${remainingSeconds} seconds`,
       remainingSeconds
     };
   }
 
-  // 清理过期的尝试记录
+  // Clean up expired attempt records
   if (now - attempt.lastAttempt > ATTEMPT_WINDOW) {
     loginAttempts.delete(ip);
     return { allowed: true };
@@ -60,30 +60,30 @@ function recordLoginAttempt(ip, success) {
   const now = Date.now();
 
   if (success) {
-    // 登录成功，清除记录
+    // Login successful, clear record
     loginAttempts.delete(ip);
     return;
   }
 
-  // 登录失败，记录尝试
+  // Login failed, record attempt
   const attempt = loginAttempts.get(ip) || { count: 0, lastAttempt: now };
   attempt.count++;
   attempt.lastAttempt = now;
 
-  // 超过最大尝试次数，封禁
+  // Exceeded max attempts, block
   if (attempt.count >= MAX_LOGIN_ATTEMPTS) {
     attempt.blockedUntil = now + BLOCK_DURATION;
-    logger.warn(`IP ${ip} 因登录失败次数过多被暂时封禁`);
+    logger.warn(`IP ${ip} temporarily blocked due to too many login failures`);
   }
 
   loginAttempts.set(ip, attempt);
 }
 
-// 登录接口
+// Login endpoint
 router.post('/login', (req, res) => {
   const clientIP = getClientIP(req);
 
-  // 检查速率限制
+  // Check rate limit
   const rateCheck = checkLoginRateLimit(clientIP);
   if (!rateCheck.allowed) {
     return res.status(429).json({
@@ -95,14 +95,14 @@ router.post('/login', (req, res) => {
 
   const { username, password } = req.body;
 
-  // 验证输入
+  // Validate input
   if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
-    return res.status(400).json({ success: false, message: '用户名和密码必填' });
+    return res.status(400).json({ success: false, message: 'Username and password are required' });
   }
 
-  // 限制输入长度防止 DoS
+  // Limit input length to prevent DoS
   if (username.length > 100 || password.length > 100) {
-    return res.status(400).json({ success: false, message: '输入过长' });
+    return res.status(400).json({ success: false, message: 'Input too long' });
   }
 
   if (username === config.admin.username && password === config.admin.password) {
@@ -111,17 +111,17 @@ router.post('/login', (req, res) => {
     res.json({ success: true, token });
   } else {
     recordLoginAttempt(clientIP, false);
-    res.status(401).json({ success: false, message: '用户名或密码错误' });
+    res.status(401).json({ success: false, message: 'Invalid username or password' });
   }
 });
 
-// Token管理API - 需要JWT认证
+// Token management API - requires JWT authentication
 router.get('/tokens', authMiddleware, async (req, res) => {
   try {
     const tokens = await tokenManager.getTokenList();
     res.json({ success: true, data: tokens });
   } catch (error) {
-    logger.error('获取Token列表失败:', error.message);
+    logger.error('Failed to get token list:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -129,7 +129,7 @@ router.get('/tokens', authMiddleware, async (req, res) => {
 router.post('/tokens', authMiddleware, async (req, res) => {
   const { access_token, refresh_token, expires_in, timestamp, enable, projectId, email } = req.body;
   if (!access_token || !refresh_token) {
-    return res.status(400).json({ success: false, message: 'access_token和refresh_token必填' });
+    return res.status(400).json({ success: false, message: 'access_token and refresh_token are required' });
   }
   const tokenData = { access_token, refresh_token, expires_in };
   if (timestamp) tokenData.timestamp = timestamp;
@@ -141,7 +141,7 @@ router.post('/tokens', authMiddleware, async (req, res) => {
     const result = await tokenManager.addToken(tokenData);
     res.json(result);
   } catch (error) {
-    logger.error('添加Token失败:', error.message);
+    logger.error('Failed to add token:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -153,7 +153,7 @@ router.put('/tokens/:refreshToken', authMiddleware, async (req, res) => {
     const result = await tokenManager.updateToken(refreshToken, updates);
     res.json(result);
   } catch (error) {
-    logger.error('更新Token失败:', error.message);
+    logger.error('Failed to update token:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -164,7 +164,7 @@ router.delete('/tokens/:refreshToken', authMiddleware, async (req, res) => {
     const result = await tokenManager.deleteToken(refreshToken);
     res.json(result);
   } catch (error) {
-    logger.error('删除Token失败:', error.message);
+    logger.error('Failed to delete token:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -172,30 +172,30 @@ router.delete('/tokens/:refreshToken', authMiddleware, async (req, res) => {
 router.post('/tokens/reload', authMiddleware, async (req, res) => {
   try {
     await tokenManager.reload();
-    res.json({ success: true, message: 'Token已热重载' });
+    res.json({ success: true, message: 'Token hot reloaded' });
   } catch (error) {
-    logger.error('热重载失败:', error.message);
+    logger.error('Hot reload failed:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// 刷新指定Token的access_token
+// Refresh specified token's access_token
 router.post('/tokens/:refreshToken/refresh', authMiddleware, async (req, res) => {
   const { refreshToken } = req.params;
   try {
-    logger.info('正在刷新token...');
+    logger.info('Refreshing token...');
     const tokens = await tokenManager.getTokenList();
     const tokenData = tokens.find(t => t.refresh_token === refreshToken);
 
     if (!tokenData) {
-      return res.status(404).json({ success: false, message: 'Token不存在' });
+      return res.status(404).json({ success: false, message: 'Token does not exist' });
     }
 
-    // 调用 tokenManager 的刷新方法
+    // Call tokenManager's refresh method
     const refreshedToken = await tokenManager.refreshToken(tokenData);
-    res.json({ success: true, message: 'Token刷新成功', data: { expires_in: refreshedToken.expires_in, timestamp: refreshedToken.timestamp } });
+    res.json({ success: true, message: 'Token refreshed successfully', data: { expires_in: refreshedToken.expires_in, timestamp: refreshedToken.timestamp } });
   } catch (error) {
-    logger.error('刷新Token失败:', error.message);
+    logger.error('Failed to refresh token:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -203,34 +203,34 @@ router.post('/tokens/:refreshToken/refresh', authMiddleware, async (req, res) =>
 router.post('/oauth/exchange', authMiddleware, async (req, res) => {
   const { code, port } = req.body;
   if (!code || !port) {
-    return res.status(400).json({ success: false, message: 'code和port必填' });
+    return res.status(400).json({ success: false, message: 'code and port are required' });
   }
 
   try {
     const account = await oauthManager.authenticate(code, port);
     const message = account.hasQuota
-      ? 'Token添加成功'
-      : 'Token添加成功（该账号无资格，已自动使用随机ProjectId）';
+      ? 'Token added successfully'
+      : 'Token added successfully (this account is not eligible, auto-using random ProjectId)';
     res.json({ success: true, data: account, message, fallbackMode: !account.hasQuota });
   } catch (error) {
-    logger.error('认证失败:', error.message);
+    logger.error('Authentication failed:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// 获取配置
+// Get configuration
 router.get('/config', authMiddleware, (req, res) => {
   try {
     const envData = parseEnvFile(envPath);
     const jsonData = getConfigJson();
     res.json({ success: true, data: { env: envData, json: jsonData } });
   } catch (error) {
-    logger.error('读取配置失败:', error.message);
+    logger.error('Failed to read configuration:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// 更新配置
+// Update configuration
 router.put('/config', authMiddleware, (req, res) => {
   try {
     const { env: envUpdates, json: jsonUpdates } = req.body;
@@ -241,61 +241,61 @@ router.put('/config', authMiddleware, (req, res) => {
     dotenv.config({ override: true });
     reloadConfig();
 
-    logger.info('配置已更新并热重载');
-    res.json({ success: true, message: '配置已保存并生效（端口/HOST修改需重启）' });
+    logger.info('Configuration updated and hot reloaded');
+    res.json({ success: true, message: 'Configuration saved and applied (port/HOST changes require restart)' });
   } catch (error) {
-    logger.error('更新配置失败:', error.message);
+    logger.error('Failed to update configuration:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// 获取轮询策略配置
+// Get rotation strategy configuration
 router.get('/rotation', authMiddleware, (req, res) => {
   try {
     const rotationConfig = tokenManager.getRotationConfig();
     res.json({ success: true, data: rotationConfig });
   } catch (error) {
-    logger.error('获取轮询配置失败:', error.message);
+    logger.error('Failed to get rotation config:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// 更新轮询策略配置
+// Update rotation strategy configuration
 router.put('/rotation', authMiddleware, (req, res) => {
   try {
     const { strategy, requestCount } = req.body;
 
-    // 验证策略值
+    // Validate strategy value
     const validStrategies = ['round_robin', 'quota_exhausted', 'request_count'];
     if (strategy && !validStrategies.includes(strategy)) {
       return res.status(400).json({
         success: false,
-        message: `无效的策略，可选值: ${validStrategies.join(', ')}`
+        message: `Invalid strategy, valid options: ${validStrategies.join(', ')}`
       });
     }
 
-    // 更新内存中的配置
+    // Update in-memory configuration
     tokenManager.updateRotationConfig(strategy, requestCount);
 
-    // 保存到config.json
+    // Save to config.json
     const currentConfig = getConfigJson();
     if (!currentConfig.rotation) currentConfig.rotation = {};
     if (strategy) currentConfig.rotation.strategy = strategy;
     if (requestCount) currentConfig.rotation.requestCount = requestCount;
     saveConfigJson(currentConfig);
 
-    // 重载配置到内存
+    // Reload configuration to memory
     reloadConfig();
 
-    logger.info(`轮询策略已更新: ${strategy || '未变'}, 请求次数: ${requestCount || '未变'}`);
-    res.json({ success: true, message: '轮询策略已更新', data: tokenManager.getRotationConfig() });
+    logger.info(`Rotation strategy updated: ${strategy || 'unchanged'}, request count: ${requestCount || 'unchanged'}`);
+    res.json({ success: true, message: 'Rotation strategy updated', data: tokenManager.getRotationConfig() });
   } catch (error) {
-    logger.error('更新轮询配置失败:', error.message);
+    logger.error('Failed to update rotation config:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// 获取指定Token的模型额度
+// Get model quotas for specified token
 router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
   try {
     const { refreshToken } = req.params;
@@ -304,32 +304,32 @@ router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
     let tokenData = tokens.find(t => t.refresh_token === refreshToken);
 
     if (!tokenData) {
-      return res.status(404).json({ success: false, message: 'Token不存在' });
+      return res.status(404).json({ success: false, message: 'Token does not exist' });
     }
 
-    // 检查token是否过期，如果过期则刷新
+    // Check if token is expired, refresh if so
     if (tokenManager.isExpired(tokenData)) {
       try {
         tokenData = await tokenManager.refreshToken(tokenData);
       } catch (error) {
-        logger.error('刷新token失败:', error.message);
-        // 使用 400 而不是 401，避免前端误认为 JWT 登录过期
-        return res.status(400).json({ success: false, message: 'Google Token已过期且刷新失败，请重新登录Google账号' });
+        logger.error('Failed to refresh token:', error.message);
+        // Use 400 instead of 401 to avoid frontend thinking JWT login expired
+        return res.status(400).json({ success: false, message: 'Google Token expired and refresh failed, please re-login your Google account' });
       }
     }
 
-    // 先从缓存获取（除非强制刷新）
+    // First get from cache (unless force refresh)
     let quotaData = forceRefresh ? null : quotaManager.getQuota(refreshToken);
 
     if (!quotaData) {
-      // 缓存未命中或强制刷新，从API获取
+      // Cache miss or force refresh, get from API
       const token = { access_token: tokenData.access_token, refresh_token: refreshToken };
       const quotas = await getModelsWithQuotas(token);
       quotaManager.updateQuota(refreshToken, quotas);
       quotaData = { lastUpdated: Date.now(), models: quotas };
     }
 
-    // 转换时间为北京时间
+    // Convert time to Beijing time
     const modelsWithBeijingTime = {};
     Object.entries(quotaData.models).forEach(([modelId, quota]) => {
       modelsWithBeijingTime[modelId] = {
@@ -347,14 +347,14 @@ router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('获取额度失败:', error.message);
+    logger.error('Failed to get quotas:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // ==================== API History ====================
 
-// Lấy lịch sử API requests
+// Get API request history
 router.get('/history', authMiddleware, (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 100;
@@ -362,18 +362,18 @@ router.get('/history', authMiddleware, (req, res) => {
     const stats = requestLogger.getStats();
     res.json({ success: true, data: { history, stats } });
   } catch (error) {
-    logger.error('获取历史记录失败:', error.message);
+    logger.error('Failed to get history:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// Thêm entry vào lịch sử (cho Playground errors)
+// Add entry to history (for Playground errors)
 router.post('/history', authMiddleware, (req, res) => {
   try {
     const { model, status, statusCode, duration, errorMessage, source } = req.body;
 
     if (!model || !status) {
-      return res.status(400).json({ success: false, message: 'model và status là bắt buộc' });
+      return res.status(400).json({ success: false, message: 'model and status are required' });
     }
 
     const record = requestLogger.logRequest({
@@ -382,7 +382,7 @@ router.post('/history', authMiddleware, (req, res) => {
       statusCode: statusCode || null,
       duration: duration || 0,
       errorMessage: errorMessage || null,
-      tokenId: source || 'playground', // Đánh dấu nguồn là playground
+      tokenId: source || 'playground', // Mark source as playground
       inputTokens: 0,
       outputTokens: 0,
       isStream: false
@@ -390,19 +390,19 @@ router.post('/history', authMiddleware, (req, res) => {
 
     res.json({ success: true, data: record });
   } catch (error) {
-    logger.error('Thêm lịch sử thất bại:', error.message);
+    logger.error('Failed to add history:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// Xóa lịch sử
+// Clear history
 router.delete('/history', authMiddleware, (req, res) => {
   try {
     requestLogger.clearHistory();
-    logger.info('历史记录已清空');
-    res.json({ success: true, message: '历史记录已清空' });
+    logger.info('History cleared');
+    res.json({ success: true, message: 'History cleared' });
   } catch (error) {
-    logger.error('清空历史记录失败:', error.message);
+    logger.error('Failed to clear history:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });

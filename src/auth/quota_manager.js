@@ -7,7 +7,7 @@ import { QUOTA_CACHE_TTL, QUOTA_CLEANUP_INTERVAL } from '../constants/index.js';
 
 class QuotaManager {
   /**
-   * @param {string} filePath - 额度数据文件路径
+   * @param {string} filePath - Quota data file path
    */
   constructor(filePath = path.join(getDataDir(), 'quotas.json')) {
     this.filePath = filePath;
@@ -40,7 +40,7 @@ class QuotaManager {
         this.cache.set(key, value);
       });
     } catch (error) {
-      log.error('加载额度文件失败:', error.message);
+      log.error('Failed to load quota file:', error.message);
     }
   }
 
@@ -56,7 +56,7 @@ class QuotaManager {
       };
       fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2), 'utf8');
     } catch (error) {
-      log.error('保存额度文件失败:', error.message);
+      log.error('Failed to save quota file:', error.message);
     }
   }
 
@@ -71,28 +71,28 @@ class QuotaManager {
   getQuota(refreshToken) {
     const data = this.cache.get(refreshToken);
     if (!data) return null;
-    
-    // 检查缓存是否过期
+
+    // Check if cache is expired
     if (Date.now() - data.lastUpdated > this.CACHE_TTL) {
       return null;
     }
-    
+
     return data;
   }
 
   cleanup() {
     const now = Date.now();
     let cleaned = 0;
-    
+
     this.cache.forEach((value, key) => {
       if (now - value.lastUpdated > this.CLEANUP_INTERVAL) {
         this.cache.delete(key);
         cleaned++;
       }
     });
-    
+
     if (cleaned > 0) {
-      log.info(`清理了 ${cleaned} 个过期的额度记录`);
+      log.info(`Cleaned up ${cleaned} expired quota records`);
       this.saveToFile();
     }
   }
@@ -111,19 +111,19 @@ class QuotaManager {
     }
   }
 
-  // 注册内存清理回调
+  // Register memory cleanup callback
   registerMemoryCleanup() {
     memoryManager.registerCleanup((pressure) => {
-      // 根据压力级别调整缓存 TTL
+      // Adjust cache TTL based on pressure level
       if (pressure === MemoryPressure.CRITICAL) {
-        // 紧急时清理所有缓存
+        // Emergency: clear all cache
         const size = this.cache.size;
         if (size > 0) {
           this.cache.clear();
-          log.info(`紧急清理 ${size} 个额度缓存`);
+          log.info(`Emergency cleared ${size} quota cache entries`);
         }
       } else if (pressure === MemoryPressure.HIGH) {
-        // 高压力时清理过期缓存
+        // High pressure: cleanup expired cache
         this.cleanup();
       }
     });

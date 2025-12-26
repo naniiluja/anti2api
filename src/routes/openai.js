@@ -1,6 +1,6 @@
 /**
- * OpenAI API 路由
- * 处理 /v1/chat/completions 和 /v1/models 端点
+ * OpenAI API routes
+ * Handle /v1/chat/completions and /v1/models endpoints
  */
 
 import { Router } from 'express';
@@ -12,21 +12,21 @@ const router = Router();
 
 /**
  * GET /v1/models
- * 获取可用模型列表
+ * Get available models list
  */
 router.get('/models', async (req, res) => {
   try {
     const models = await getAvailableModels();
     res.json(models);
   } catch (error) {
-    logger.error('获取模型列表失败:', error.message);
+    logger.error('Failed to get models list:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
 /**
  * POST /v1/chat/completions
- * 处理聊天补全请求
+ * Handle chat completion requests
  */
 router.post('/chat/completions', handleOpenAIRequest);
 

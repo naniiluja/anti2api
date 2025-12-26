@@ -1,6 +1,6 @@
 /**
- * Gemini API 路由
- * 处理 /v1beta/models/* 端点
+ * Gemini API routes
+ * Handle /v1beta/models/* endpoints
  */
 
 import { Router } from 'express';
@@ -10,19 +10,19 @@ const router = Router();
 
 /**
  * GET /v1beta/models
- * 获取模型列表（Gemini格式）
+ * Get models list (Gemini format)
  */
 router.get('/models', handleGeminiModelsList);
 
 /**
  * GET /v1beta/models/:model
- * 获取单个模型详情（Gemini格式）
+ * Get single model details (Gemini format)
  */
 router.get('/models/:model', handleGeminiModelDetail);
 
 /**
  * POST /v1beta/models/:model:streamGenerateContent
- * 流式生成内容
+ * Stream generate content
  */
 router.post('/models/:model\\:streamGenerateContent', (req, res) => {
   const modelName = req.params.model;
@@ -31,7 +31,7 @@ router.post('/models/:model\\:streamGenerateContent', (req, res) => {
 
 /**
  * POST /v1beta/models/:model:generateContent
- * 生成内容（支持通过 alt=sse 参数启用流式）
+ * Generate content (supports streaming via alt=sse parameter)
  */
 router.post('/models/:model\\:generateContent', (req, res) => {
   const modelName = req.params.model;

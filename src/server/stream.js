@@ -1,6 +1,6 @@
 /**
- * SSE 流式响应和心跳机制工具模块
- * 提供统一的流式响应处理、心跳保活、429重试等功能
+ * SSE streaming response and heartbeat mechanism utility module
+ * Provides unified streaming response handling, heartbeat keep-alive, 429 retry, etc.
  */
 
 import config from '../config/config.js';
@@ -8,14 +8,14 @@ import logger from '../utils/logger.js';
 import memoryManager, { registerMemoryPoolCleanup } from '../utils/memoryManager.js';
 import { DEFAULT_HEARTBEAT_INTERVAL } from '../constants/index.js';
 
-// ==================== 心跳机制（防止 CF 超时） ====================
+// ==================== Heartbeat mechanism (prevent CF timeout) ====================
 const HEARTBEAT_INTERVAL = config.server.heartbeatInterval || DEFAULT_HEARTBEAT_INTERVAL;
 const SSE_HEARTBEAT = Buffer.from(': heartbeat\n\n');
 
 /**
- * 创建心跳定时器
- * @param {Response} res - Express响应对象
- * @returns {NodeJS.Timeout} 定时器
+ * Create heartbeat timer
+ * @param {Response} res - Express response object
+ * @returns {NodeJS.Timeout} Timer
  */
 export const createHeartbeat = (res) => {
   const timer = setInterval(() => {
@@ -25,21 +25,21 @@ export const createHeartbeat = (res) => {
       clearInterval(timer);
     }
   }, HEARTBEAT_INTERVAL);
-  
-  // 响应结束时清理
+
+  // Clean up when response ends
   res.on('close', () => clearInterval(timer));
   res.on('finish', () => clearInterval(timer));
-  
+
   return timer;
 };
 
-// ==================== 预编译的常量字符串（避免重复创建） ====================
+// ==================== Pre-compiled constant strings (avoid repeated creation) ====================
 const SSE_PREFIX = Buffer.from('data: ');
 const SSE_SUFFIX = Buffer.from('\n\n');
 const SSE_DONE = Buffer.from('data: [DONE]\n\n');
 
 /**
- * 生成响应元数据
+ * Generate response metadata
  * @returns {{id: string, created: number}}
  */
 export const createResponseMeta = () => ({
@@ -48,27 +48,27 @@ export const createResponseMeta = () => ({
 });
 
 /**
- * 设置流式响应头
- * @param {Response} res - Express响应对象
+ * Set streaming response headers
+ * @param {Response} res - Express response object
  */
 export const setStreamHeaders = (res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // 禁用 nginx 缓冲
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
 };
 
-// ==================== 对象池（减少 GC） ====================
+// ==================== Object Pool (reduce GC) ====================
 const chunkPool = [];
 
 /**
- * 从对象池获取 chunk 对象
+ * Get chunk object from object pool
  * @returns {Object}
  */
 export const getChunkObject = () => chunkPool.pop() || { choices: [{ index: 0, delta: {}, finish_reason: null }] };
 
 /**
- * 释放 chunk 对象回对象池
+ * Release chunk object back to object pool
  * @param {Object} obj 
  */
 export const releaseChunkObject = (obj) => {
@@ -76,26 +76,26 @@ export const releaseChunkObject = (obj) => {
   if (chunkPool.length < maxSize) chunkPool.push(obj);
 };
 
-// 注册内存清理回调
+// Register memory cleanup callback
 registerMemoryPoolCleanup(chunkPool, () => memoryManager.getPoolSizes().chunk);
 
 /**
- * 获取当前对象池大小（用于监控）
+ * Get current object pool size (for monitoring)
  * @returns {number}
  */
 export const getChunkPoolSize = () => chunkPool.length;
 
 /**
- * 清空对象池
+ * Clear object pool
  */
 export const clearChunkPool = () => {
   chunkPool.length = 0;
 };
 
 /**
- * 零拷贝写入流式数据
- * @param {Response} res - Express响应对象
- * @param {Object} data - 要发送的数据
+ * Zero-copy write streaming data
+ * @param {Response} res - Express response object
+ * @param {Object} data - Data to send
  */
 export const writeStreamData = (res, data) => {
   const json = JSON.stringify(data);
@@ -105,8 +105,8 @@ export const writeStreamData = (res, data) => {
 };
 
 /**
- * 结束流式响应
- * @param {Response} res - Express响应对象
+ * End streaming response
+ * @param {Response} res - Express response object
  */
 export const endStream = (res, isWriteDone = true) => {
   if (res.writableEnded) return;
@@ -114,28 +114,28 @@ export const endStream = (res, isWriteDone = true) => {
   res.end();
 };
 
-// ==================== 通用重试工具（处理 429） ====================
+// ==================== Generic Retry Utility (handle 429) ====================
 
 /**
- * 带 429 重试的执行器
- * @param {Function} fn - 要执行的异步函数，接收 attempt 参数
- * @param {number} maxRetries - 最大重试次数
- * @param {string} loggerPrefix - 日志前缀
+ * Executor with 429 retry
+ * @param {Function} fn - Async function to execute, receives attempt parameter
+ * @param {number} maxRetries - Maximum retry count
+ * @param {string} loggerPrefix - Logger prefix
  * @returns {Promise<any>}
  */
 export const with429Retry = async (fn, maxRetries, loggerPrefix = '') => {
   const retries = Number.isFinite(maxRetries) && maxRetries > 0 ? Math.floor(maxRetries) : 0;
   let attempt = 0;
-  // 首次执行 + 最多 retries 次重试
+  // First execution + up to retries times
   while (true) {
     try {
       return await fn(attempt);
     } catch (error) {
-      // 兼容多种错误格式：error.status, error.statusCode, error.response?.status
+      // Compatible with multiple error formats: error.status, error.statusCode, error.response?.status
       const status = Number(error.status || error.statusCode || error.response?.status);
       if (status === 429 && attempt < retries) {
         const nextAttempt = attempt + 1;
-        logger.warn(`${loggerPrefix}收到 429，正在进行第 ${nextAttempt} 次重试（共 ${retries} 次）`);
+        logger.warn(`${loggerPrefix}Received 429, performing retry ${nextAttempt} of ${retries}`);
         attempt = nextAttempt;
         continue;
       }

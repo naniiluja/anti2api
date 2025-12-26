@@ -1,20 +1,21 @@
 /**
- * Request Logger - Lưu lịch sử các lần gọi API
+ * Request Logger - Stores API call history
  */
 
 const MAX_HISTORY_SIZE = 100;
 const requestHistory = [];
 
 /**
- * Log một request vào history
- * @param {Object} data - Thông tin request
+ * Log a request into history
+ * @param {Object} data - Request information
+ * @returns {Object} The logged record
  */
 export function logRequest(data) {
   const record = {
     id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
     timestamp: Date.now(),
     model: data.model || 'unknown',
-    tokenId: data.tokenId || null, // Short ID của token (không lưu full để bảo mật)
+    tokenId: data.tokenId || null, // Short ID of the token (full ID not stored for security)
     status: data.status || 'unknown', // 'success', 'error'
     statusCode: data.statusCode || null,
     duration: data.duration || 0, // ms
@@ -26,7 +27,7 @@ export function logRequest(data) {
 
   requestHistory.unshift(record);
 
-  // Giữ tối đa MAX_HISTORY_SIZE records
+  // Keep at most MAX_HISTORY_SIZE records
   while (requestHistory.length > MAX_HISTORY_SIZE) {
     requestHistory.pop();
   }
@@ -35,23 +36,24 @@ export function logRequest(data) {
 }
 
 /**
- * Lấy toàn bộ history
- * @param {number} limit - Số lượng records tối đa
- * @returns {Array}
+ * Get the entire history
+ * @param {number} limit - Maximum number of records
+ * @returns {Array} List of history records
  */
 export function getHistory(limit = MAX_HISTORY_SIZE) {
   return requestHistory.slice(0, limit);
 }
 
 /**
- * Xóa toàn bộ history
+ * Clear the entire history
  */
 export function clearHistory() {
   requestHistory.length = 0;
 }
 
 /**
- * Lấy thống kê tổng quan
+ * Get overview statistics
+ * @returns {Object} Summary statistics
  */
 export function getStats() {
   const total = requestHistory.length;
@@ -59,7 +61,7 @@ export function getStats() {
   const error = requestHistory.filter(r => r.status === 'error').length;
   const totalDuration = requestHistory.reduce((sum, r) => sum + r.duration, 0);
   const avgDuration = total > 0 ? Math.round(totalDuration / total) : 0;
-  
+
   return {
     total,
     success,

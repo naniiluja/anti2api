@@ -1,74 +1,74 @@
-# 使用编译后的二进制文件运行
-# 这个镜像更小，启动更快，内存占用更低
+# Run using compiled binary file
+# This image is smaller, starts faster, and has lower memory usage
 #
-# 构建方式：
-# 1. 先运行 npm run build:linux 或 npm run build:linux-arm64 生成 dist 目录
-# 2. 然后运行 docker build -f Dockerfile.binary -t antigravity .
+# Build method:
+# 1. First run npm run build:linux or npm run build:linux-arm64 to generate dist directory
+# 2. Then run docker build -f Dockerfile.binary -t antigravity .
 
 FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# 安装必要的运行时依赖
+# Install necessary runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制编译后的文件（由 CI 工作流预先编译）
-# 使用通配符匹配不同架构的二进制文件
+# Copy compiled files (pre-compiled by CI workflow)
+# Use wildcards to match binary files of different architectures
 COPY dist/antigravity-linux-* /app/antigravity
 COPY dist/public /app/public
 COPY dist/bin /app/bin
 COPY dist/config.json /app/config.json
 
-# 设置执行权限
+# Set execution permissions
 RUN chmod +x /app/antigravity && \
     (chmod +x /app/bin/* 2>/dev/null || true)
 
-# 创建数据和图片目录，以及带默认配置的 .env 文件
+# Create data and image directories, and a .env file with default configuration
 RUN mkdir -p /app/data /app/public/images && \
-    echo "# 敏感配置（只在 .env 中配置）" > /app/.env && \
-    echo "# 如果不配置以下三项，系统会自动生成随机凭据并在启动时显示" >> /app/.env && \
+    echo "# Sensitive configuration (configure only in .env)" > /app/.env && \
+    echo "# If the following three items are not configured, the system will auto-generate random credentials and display them at startup" >> /app/.env && \
     echo "# API_KEY=your-api-key" >> /app/.env && \
     echo "# ADMIN_USERNAME=your-username" >> /app/.env && \
     echo "# ADMIN_PASSWORD=your-password" >> /app/.env && \
     echo "# JWT_SECRET=your-jwt-secret" >> /app/.env && \
     echo "" >> /app/.env && \
-    echo "# 可选配置" >> /app/.env && \
+    echo "# Optional configuration" >> /app/.env && \
     echo "# PROXY=http://127.0.0.1:7890" >> /app/.env && \
-    echo "SYSTEM_INSTRUCTION=你是聊天机器人，名字叫萌萌，如同名字这般，你的性格是软软糯糯萌萌哒的，专门为用户提供聊天和情绪价值，协助进行小说创作或者角色扮演" >> /app/.env && \
+    echo "SYSTEM_INSTRUCTION=You are a chatbot named Meng Meng. Just like your name, you have a soft, cute, and adorable personality. You are dedicated to providing chat and emotional value to users, assisting in novel writing or roleplay." >> /app/.env && \
     echo "# IMAGE_BASE_URL=http://your-domain.com" >> /app/.env
 
-# 创建启动脚本：同步环境变量到 .env 文件
+# Create startup script: sync environment variables to .env file
 RUN cat > /app/entrypoint.sh << 'EOF'
 #!/bin/sh
-# 同步环境变量到 .env 文件
+# Sync environment variables to .env file
 ENV_FILE="/app/.env"
 
-# 同步单个环境变量的函数
-# 使用 ${var+x} 语法检测变量是否被设置（包括空值）
+# Helper function to sync a single environment variable
+# Uses ${var+x} syntax to detect if variable is set (including empty values)
 sync_env() {
   key=$1
-  # 检查环境变量是否被设置（包括空值）
+  # Check if environment variable is set (including empty values)
   if eval "[ \"\${${key}+x}\" ]"; then
     value=$(eval echo \"\$$key\")
-    # 检查是否已存在该配置
+    # Check if this config already exists
     if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
-      # 替换现有配置（使用 # 作为分隔符避免值中的特殊字符问题）
+      # Replace existing config (using # as separator to avoid issues with special characters in values)
       sed -i "s#^${key}=.*#${key}=${value}#" "$ENV_FILE"
     else
-      # 添加新配置
+      # Add new config
       echo "${key}=${value}" >> "$ENV_FILE"
     fi
     if [ -n "$value" ]; then
-      echo "✓ 已同步环境变量: ${key}=${value}"
+      echo "✓ Synced environment variable: ${key}=${value}"
     else
-      echo "✓ 已同步环境变量: ${key}=(空值)"
+      echo "✓ Synced environment variable: ${key}=(empty)"
     fi
   fi
 }
 
-# 同步所有支持的环境变量
+# Sync all supported environment variables
 sync_env "API_KEY"
 sync_env "ADMIN_USERNAME"
 sync_env "ADMIN_PASSWORD"
@@ -77,13 +77,13 @@ sync_env "PROXY"
 sync_env "SYSTEM_INSTRUCTION"
 sync_env "IMAGE_BASE_URL"
 
-# 启动应用
+# Start application
 exec /app/antigravity
 EOF
 RUN chmod +x /app/entrypoint.sh
 
-# 暴露端口
+# Expose port
 EXPOSE 8045
 
-# 启动应用
+# Start application
 CMD ["/app/entrypoint.sh"]

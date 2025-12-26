@@ -1,14 +1,14 @@
 import { generateRequestBody } from './utils.js';
 
-// 测试场景：user -> assistant -> assistant(工具调用,无content) -> tool1结果 -> tool2结果
+// Test scenario: user -> assistant -> assistant(tool calls, no content) -> tool1 result -> tool2 result
 const testMessages = [
   {
     role: "user",
-    content: "帮我查询天气和新闻"
+    content: "Help me check the weather and news"
   },
   {
     role: "assistant",
-    content: "好的，我来帮你查询。"
+    content: "Okay, I'll help you check."
   },
   {
     role: "assistant",
@@ -19,7 +19,7 @@ const testMessages = [
         type: "function",
         function: {
           name: "get_weather",
-          arguments: JSON.stringify({ city: "北京" })
+          arguments: JSON.stringify({ city: "Beijing" })
         }
       },
       {
@@ -27,7 +27,7 @@ const testMessages = [
         type: "function",
         function: {
           name: "get_news",
-          arguments: JSON.stringify({ category: "科技" })
+          arguments: JSON.stringify({ category: "Technology" })
         }
       }
     ]
@@ -35,12 +35,12 @@ const testMessages = [
   {
     role: "tool",
     tool_call_id: "call_001",
-    content: "北京今天晴，温度25度"
+    content: "Beijing today is sunny, temperature 25 degrees"
   },
   {
     role: "tool",
     tool_call_id: "call_002",
-    content: "最新科技新闻：AI技术突破"
+    content: "Latest tech news: AI technology breakthrough"
   }
 ];
 
@@ -49,7 +49,7 @@ const testTools = [
     type: "function",
     function: {
       name: "get_weather",
-      description: "获取天气信息",
+      description: "Get weather information",
       parameters: {
         type: "object",
         properties: {
@@ -62,7 +62,7 @@ const testTools = [
     type: "function",
     function: {
       name: "get_news",
-      description: "获取新闻",
+      description: "Get news",
       parameters: {
         type: "object",
         properties: {
@@ -73,20 +73,20 @@ const testTools = [
   }
 ];
 
-console.log("=== 测试消息转换 ===\n");
-console.log("输入 OpenAI 格式消息:");
+console.log("=== Testing Message Transform ===\n");
+console.log("Input OpenAI format messages:");
 console.log(JSON.stringify(testMessages, null, 2));
 
 const result = generateRequestBody(testMessages, "claude-sonnet-4-5", {}, testTools);
 
-console.log("\n=== 转换后的 Antigravity 格式 ===\n");
+console.log("\n=== Transformed Antigravity Format ===\n");
 console.log(JSON.stringify(result.request.contents, null, 2));
 
-console.log("\n=== 验证结果 ===");
+console.log("\n=== Verification Results ===");
 const contents = result.request.contents;
-console.log(`✓ 消息数量: ${contents.length}`);
-console.log(`✓ 第1条 (user): ${contents[0]?.role === 'user' ? '✓' : '✗'}`);
-console.log(`✓ 第2条 (model): ${contents[1]?.role === 'model' ? '✓' : '✗'}`);
-console.log(`✓ 第3条 (model+tools): ${contents[2]?.role === 'model' && contents[2]?.parts?.length === 2 ? '✓' : '✗'}`);
-console.log(`✓ 第4条 (tool1 response): ${contents[3]?.role === 'user' && contents[3]?.parts[0]?.functionResponse ? '✓' : '✗'}`);
-console.log(`✓ 第5条 (tool2 response): ${contents[4]?.role === 'user' && contents[4]?.parts[0]?.functionResponse ? '✓' : '✗'}`);
+console.log(`✓ Message count: ${contents.length}`);
+console.log(`✓ Message 1 (user): ${contents[0]?.role === 'user' ? '✓' : '✗'}`);
+console.log(`✓ Message 2 (model): ${contents[1]?.role === 'model' ? '✓' : '✗'}`);
+console.log(`✓ Message 3 (model+tools): ${contents[2]?.role === 'model' && contents[2]?.parts?.length === 2 ? '✓' : '✗'}`);
+console.log(`✓ Message 4 (tool1 response): ${contents[3]?.role === 'user' && contents[3]?.parts[0]?.functionResponse ? '✓' : '✗'}`);
+console.log(`✓ Message 5 (tool2 response): ${contents[4]?.role === 'user' && contents[4]?.parts[0]?.functionResponse ? '✓' : '✗'}`);

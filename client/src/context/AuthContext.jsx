@@ -14,7 +14,7 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
     const [token, setToken] = useState(localStorage.getItem('authToken'));
-    // const [user, setUser] = useState(null); // Backend này ko trả về user object khi login, chỉ token.
+    // const [user, setUser] = useState(null); // This backend doesn't return a user object on login, only a token.
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {

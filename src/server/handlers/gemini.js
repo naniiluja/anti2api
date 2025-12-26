@@ -94,8 +94,8 @@ export const convertToGeminiModelList = (openaiModels) => {
     version: "001",
     displayName: model.id,
     description: "Imported model",
-    inputTokenLimit: 32768, // 默认值
-    outputTokenLimit: 8192, // 默认值
+    inputTokenLimit: 32768, // Default value
+    outputTokenLimit: 8192, // Default value
     supportedGenerationMethods: ["generateContent", "countTokens"],
     temperature: 0.9,
     topP: 1.0,
@@ -224,7 +224,7 @@ export const handleGeminiRequest = async (req, res, modelName, isStream) => {
         );
 
         // Send finish chunk and usage
-        const finishReason = hasToolCall ? "STOP" : "STOP"; // Gemini 工具调用也是 STOP
+        const finishReason = hasToolCall ? "STOP" : "STOP"; // Gemini tool calls also use STOP
         const finalChunk = createGeminiResponse(null, null, null, null, finishReason, usageData);
         writeStreamData(res, finalChunk);
 

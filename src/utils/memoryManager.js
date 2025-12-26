@@ -1,7 +1,7 @@
 /**
- * 智能内存管理器
- * 采用分级策略，根据内存压力动态调整缓存和对象池
- * 阈值基于用户配置的 memoryThreshold（MB）动态计算
+ * Intelligent Memory Manager
+ * Uses tiered strategy to dynamically adjust cache and object pools based on memory pressure
+ * Thresholds are dynamically calculated based on user-configured memoryThreshold (MB)
  * @module utils/memoryManager
  */
 
@@ -9,35 +9,35 @@ import logger from './logger.js';
 import { GC_COOLDOWN } from '../constants/index.js';
 
 /**
- * 内存压力级别枚举
+ * Memory pressure level enum
  * @enum {string}
  */
 const MemoryPressure = {
-  LOW: 'low',       // < 30% 阈值 - 正常运行
-  MEDIUM: 'medium', // 30%-60% 阈值 - 轻度清理
-  HIGH: 'high',     // 60%-100% 阈值 - 积极清理
-  CRITICAL: 'critical' // > 100% 阈值 - 紧急清理
+  LOW: 'low',       // < 30% threshold - Normal operation
+  MEDIUM: 'medium', // 30%-60% threshold - Light cleanup
+  HIGH: 'high',     // 60%-100% threshold - Aggressive cleanup
+  CRITICAL: 'critical' // > 100% threshold - Emergency cleanup
 };
 
 /**
- * 根据用户配置的内存阈值计算各级别阈值
- * @param {number} thresholdMB - 用户配置的内存阈值（MB），即高压力阈值
- * @returns {Object} 各级别阈值（字节）
+ * Calculate thresholds for each level based on user-configured memory threshold
+ * @param {number} thresholdMB - User-configured memory threshold (MB), i.e., high pressure threshold
+ * @returns {Object} Thresholds for each level (bytes)
  */
 function calculateThresholds(thresholdMB) {
   const highBytes = thresholdMB * 1024 * 1024;
   return {
-    LOW: Math.floor(highBytes * 0.3),      // 30% 为低压力阈值
-    MEDIUM: Math.floor(highBytes * 0.6),   // 60% 为中等压力阈值
-    HIGH: highBytes,                        // 100% 为高压力阈值（用户配置值）
-    TARGET: Math.floor(highBytes * 0.5)    // 50% 为目标内存
+    LOW: Math.floor(highBytes * 0.3),      // 30% is low pressure threshold
+    MEDIUM: Math.floor(highBytes * 0.6),   // 60% is medium pressure threshold
+    HIGH: highBytes,                        // 100% is high pressure threshold (user-configured value)
+    TARGET: Math.floor(highBytes * 0.5)    // 50% is target memory
   };
 }
 
-// 默认阈值（100MB），会在初始化时被配置覆盖
+// Default thresholds (100MB), will be overridden during initialization
 let THRESHOLDS = calculateThresholds(100);
 
-// 对象池最大大小配置（根据压力调整）
+// Object pool max size configuration (adjusted by pressure)
 const POOL_SIZES = {
   [MemoryPressure.LOW]: { chunk: 30, toolCall: 15, lineBuffer: 5 },
   [MemoryPressure.MEDIUM]: { chunk: 20, toolCall: 10, lineBuffer: 3 },
@@ -46,7 +46,7 @@ const POOL_SIZES = {
 };
 
 /**
- * 内存管理器类
+ * Memory Manager class
  */
 class MemoryManager {
   constructor() {
@@ -60,10 +60,10 @@ class MemoryManager {
     this.gcCooldown = GC_COOLDOWN;
     this.checkInterval = null;
     this.isShuttingDown = false;
-    /** @type {number} 用户配置的内存阈值（MB） */
+    /** @type {number} User-configured memory threshold (MB) */
     this.configuredThresholdMB = 100;
-    
-    // 统计信息
+
+    // Statistics
     this.stats = {
       gcCount: 0,
       cleanupCount: 0,
@@ -72,19 +72,19 @@ class MemoryManager {
   }
 
   /**
-   * 设置内存阈值（从配置加载）
-   * @param {number} thresholdMB - 内存阈值（MB）
+   * Set memory threshold (loaded from config)
+   * @param {number} thresholdMB - Memory threshold (MB)
    */
   setThreshold(thresholdMB) {
     if (thresholdMB && thresholdMB > 0) {
       this.configuredThresholdMB = thresholdMB;
       THRESHOLDS = calculateThresholds(thresholdMB);
-      logger.info(`内存阈值已设置: ${thresholdMB}MB (LOW: ${Math.floor(THRESHOLDS.LOW/1024/1024)}MB, MEDIUM: ${Math.floor(THRESHOLDS.MEDIUM/1024/1024)}MB, HIGH: ${Math.floor(THRESHOLDS.HIGH/1024/1024)}MB)`);
+      logger.info(`Memory threshold set: ${thresholdMB}MB (LOW: ${Math.floor(THRESHOLDS.LOW / 1024 / 1024)}MB, MEDIUM: ${Math.floor(THRESHOLDS.MEDIUM / 1024 / 1024)}MB, HIGH: ${Math.floor(THRESHOLDS.HIGH / 1024 / 1024)}MB)`);
     }
   }
 
   /**
-   * 获取当前阈值配置
+   * Get current threshold configuration
    */
   getThresholds() {
     return {
@@ -97,25 +97,25 @@ class MemoryManager {
   }
 
   /**
-   * 启动内存监控
-   * @param {number} interval - 检查间隔（毫秒）
+   * Start memory monitoring
+   * @param {number} interval - Check interval (milliseconds)
    */
   start(interval = 30000) {
     if (this.checkInterval) return;
-    
+
     this.checkInterval = setInterval(() => {
       if (!this.isShuttingDown) {
         this.check();
       }
     }, interval);
-    
-    // 首次立即检查
+
+    // First check immediately
     this.check();
-    logger.info(`内存管理器已启动 (检查间隔: ${interval/1000}秒)`);
+    logger.info(`Memory manager started (check interval: ${interval / 1000}s)`);
   }
 
   /**
-   * 停止内存监控
+   * Stop memory monitoring
    */
   stop() {
     this.isShuttingDown = true;
@@ -124,19 +124,19 @@ class MemoryManager {
       this.checkInterval = null;
     }
     this.cleanupCallbacks.clear();
-    logger.info('内存管理器已停止');
+    logger.info('Memory manager stopped');
   }
 
   /**
-   * 注册清理回调
-   * @param {Function} callback - 清理函数，接收 pressure 参数
+   * Register cleanup callback
+   * @param {Function} callback - Cleanup function, receives pressure parameter
    */
   registerCleanup(callback) {
     this.cleanupCallbacks.add(callback);
   }
 
   /**
-   * 取消注册清理回调
+   * Unregister cleanup callback
    * @param {Function} callback
    */
   unregisterCleanup(callback) {
@@ -144,7 +144,7 @@ class MemoryManager {
   }
 
   /**
-   * 获取当前内存使用情况
+   * Get current memory usage
    */
   getMemoryUsage() {
     const usage = process.memoryUsage();
@@ -158,7 +158,7 @@ class MemoryManager {
   }
 
   /**
-   * 确定内存压力级别
+   * Determine memory pressure level
    */
   getPressureLevel(heapUsed) {
     if (heapUsed < THRESHOLDS.LOW) return MemoryPressure.LOW;
@@ -168,38 +168,38 @@ class MemoryManager {
   }
 
   /**
-   * 获取当前压力下的对象池大小配置
+   * Get object pool size configuration for current pressure
    */
   getPoolSizes() {
     return POOL_SIZES[this.currentPressure];
   }
 
   /**
-   * 获取当前压力级别
+   * Get current pressure level
    */
   getCurrentPressure() {
     return this.currentPressure;
   }
 
   /**
-   * 检查内存并触发相应清理
+   * Check memory and trigger corresponding cleanup
    */
   check() {
     const { heapUsed, heapUsedMB } = this.getMemoryUsage();
     const newPressure = this.getPressureLevel(heapUsed);
-    
-    // 更新峰值统计
+
+    // Update peak statistics
     if (heapUsed > this.stats.peakMemory) {
       this.stats.peakMemory = heapUsed;
     }
-    
-    // 压力级别变化时记录日志
+
+    // Log when pressure level changes
     if (newPressure !== this.currentPressure) {
-      logger.info(`内存压力变化: ${this.currentPressure} -> ${newPressure} (${heapUsedMB}MB)`);
+      logger.info(`Memory pressure changed: ${this.currentPressure} -> ${newPressure} (${heapUsedMB}MB)`);
       this.currentPressure = newPressure;
     }
-    
-    // 根据压力级别执行不同策略
+
+    // Execute different strategies based on pressure level
     switch (newPressure) {
       case MemoryPressure.CRITICAL:
         this.handleCriticalPressure(heapUsedMB);
@@ -210,60 +210,60 @@ class MemoryManager {
       case MemoryPressure.MEDIUM:
         this.handleMediumPressure(heapUsedMB);
         break;
-      // LOW 压力不需要特殊处理
+      // LOW pressure doesn't need special handling
     }
-    
+
     return newPressure;
   }
 
   /**
-   * 处理中等压力
+   * Handle medium pressure
    */
   handleMediumPressure(heapUsedMB) {
-    // 通知各模块缩减对象池
+    // Notify modules to reduce object pools
     this.notifyCleanup(MemoryPressure.MEDIUM);
     this.stats.cleanupCount++;
   }
 
   /**
-   * 处理高压力
+   * Handle high pressure
    */
   handleHighPressure(heapUsedMB) {
-    logger.info(`内存较高 (${heapUsedMB}MB)，执行积极清理`);
+    logger.info(`Memory high (${heapUsedMB}MB), performing aggressive cleanup`);
     this.notifyCleanup(MemoryPressure.HIGH);
     this.stats.cleanupCount++;
-    
-    // 尝试触发 GC（带冷却）
+
+    // Try to trigger GC (with cooldown)
     this.tryGC();
   }
 
   /**
-   * 处理紧急压力
+   * Handle critical pressure
    */
   handleCriticalPressure(heapUsedMB) {
-    logger.warn(`内存紧急 (${heapUsedMB}MB)，执行紧急清理`);
+    logger.warn(`Memory critical (${heapUsedMB}MB), performing emergency cleanup`);
     this.notifyCleanup(MemoryPressure.CRITICAL);
     this.stats.cleanupCount++;
-    
-    // 强制 GC（忽略冷却）
+
+    // Force GC (ignore cooldown)
     this.forceGC();
   }
 
   /**
-   * 通知所有注册的清理回调
+   * Notify all registered cleanup callbacks
    */
   notifyCleanup(pressure) {
     for (const callback of this.cleanupCallbacks) {
       try {
         callback(pressure);
       } catch (error) {
-        logger.error('清理回调执行失败:', error.message);
+        logger.error('Cleanup callback execution failed:', error.message);
       }
     }
   }
 
   /**
-   * 尝试触发 GC（带冷却时间）
+   * Try to trigger GC (with cooldown time)
    */
   tryGC() {
     const now = Date.now();
@@ -274,7 +274,7 @@ class MemoryManager {
   }
 
   /**
-   * 强制触发 GC
+   * Force trigger GC
    */
   forceGC() {
     if (global.gc) {
@@ -283,21 +283,21 @@ class MemoryManager {
       this.lastGCTime = Date.now();
       this.stats.gcCount++;
       const after = this.getMemoryUsage().heapUsedMB;
-      logger.info(`GC 完成: ${before}MB -> ${after}MB (释放 ${(before - after).toFixed(1)}MB)`);
+      logger.info(`GC completed: ${before}MB -> ${after}MB (freed ${(before - after).toFixed(1)}MB)`);
       return true;
     }
     return false;
   }
 
   /**
-   * 手动触发检查和清理
+   * Manually trigger check and cleanup
    */
   cleanup() {
     return this.check();
   }
 
   /**
-   * 获取统计信息
+   * Get statistics
    */
   getStats() {
     const memory = this.getMemoryUsage();
@@ -312,11 +312,11 @@ class MemoryManager {
   }
 }
 
-// 单例导出
+// Singleton export
 const memoryManager = new MemoryManager();
 export default memoryManager;
 
-// 统一封装注册清理回调，方便在各模块中保持一致风格
+// Unified wrapper for registering cleanup callback, for consistent style across modules
 export function registerMemoryPoolCleanup(pool, getMaxSize) {
   memoryManager.registerCleanup(() => {
     const maxSize = getMaxSize();
