@@ -11,6 +11,7 @@ import { deepMerge } from '../utils/deepMerge.js';
 import { getModelsWithQuotas } from '../api/client.js';
 import { getEnvPath } from '../utils/paths.js';
 import requestLogger from '../utils/requestLogger.js';
+import chatSessionStorage from '../utils/chatSessionStorage.js';
 import dotenv from 'dotenv';
 
 const envPath = getEnvPath();
@@ -403,6 +404,77 @@ router.delete('/history', authMiddleware, (req, res) => {
     res.json({ success: true, message: 'History cleared' });
   } catch (error) {
     logger.error('Failed to clear history:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Chat Sessions ====================
+
+// Get all chat sessions
+router.get('/chat-sessions', authMiddleware, (req, res) => {
+  try {
+    const sessions = chatSessionStorage.getChatSessions();
+    res.json({ success: true, data: sessions });
+  } catch (error) {
+    logger.error('Failed to get chat sessions:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Create a new chat session
+router.post('/chat-sessions', authMiddleware, (req, res) => {
+  try {
+    const { name } = req.body;
+    const session = chatSessionStorage.createChatSession(name || 'New Chat');
+    res.json({ success: true, data: session });
+  } catch (error) {
+    logger.error('Failed to create chat session:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get a chat session by ID
+router.get('/chat-sessions/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const session = chatSessionStorage.getChatSession(id);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+    res.json({ success: true, data: session });
+  } catch (error) {
+    logger.error('Failed to get chat session:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update a chat session
+router.put('/chat-sessions/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const session = chatSessionStorage.updateChatSession(id, updates);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+    res.json({ success: true, data: session });
+  } catch (error) {
+    logger.error('Failed to update chat session:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete a chat session
+router.delete('/chat-sessions/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = chatSessionStorage.deleteChatSession(id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+    res.json({ success: true, message: 'Session deleted' });
+  } catch (error) {
+    logger.error('Failed to delete chat session:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });

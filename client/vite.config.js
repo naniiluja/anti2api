@@ -9,7 +9,7 @@ const getBackendPort = () => {
   try {
     const configPath = path.resolve(__dirname, '../config.json')
     const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-    return config.server?.port || 8045
+    return config.server?.port || 8046
   } catch (e) {
     console.warn('Could not read config.json, using default port 8045')
     return 8045

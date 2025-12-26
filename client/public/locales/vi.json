@@ -209,6 +209,8 @@
         "generating": "Đang tạo...",
         "tempHint": "Giá trị cao = sáng tạo hơn",
         "reasoningHint": "Bật chế độ suy luận theo chuỗi",
+        "promptCaching": "Prompt Caching",
+        "promptCachingHint": "Lưu cache ngữ cảnh hội thoại để phản hồi nhanh hơn (mô hình Claude)",
         "textToImage": "Văn bản thành Hình",
         "imageToImage": "Hình thành Hình",
         "gallery": "Thư viện ảnh",
@@ -226,7 +228,12 @@
         "generationStarted": "Bắt đầu tạo hình ảnh...",
         "generationComplete": "Tạo hình ảnh thành công!",
         "generationFailed": "Tạo hình ảnh thất bại",
-        "clickToView": "Click để phóng to"
+        "clickToView": "Click để phóng to",
+        "editMessage": "Chỉnh sửa",
+        "saveEdit": "Lưu",
+        "cancelEdit": "Hủy",
+        "previousVersion": "Phiên bản trước",
+        "nextVersion": "Phiên bản sau"
     },
     "common": {
         "cancel": "Hủy",

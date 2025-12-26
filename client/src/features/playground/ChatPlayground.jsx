@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../../context/I18nContext';
-import { VscSettingsGear, VscAdd, VscTrash, VscSend, VscClose } from 'react-icons/vsc';
+import { VscSettingsGear, VscSend, VscClose, VscChevronLeft, VscChevronRight } from 'react-icons/vsc';
 import ChatMessage from './ChatMessage';
 import ChatSessionHistory from './ChatSessionHistory';
 import ParameterModal from './ParameterModal';
@@ -15,10 +15,12 @@ import {
 
 const DEFAULT_PARAMS = {
     temperature: 0.7,
-    max_tokens: 16384, // Higher default to support thinking models
+    max_tokens: 16384,
     top_p: 1,
     reasoning_effort: 'none'
 };
+
+const MAX_VERSIONS = 10;
 
 const ChatPlayground = () => {
     const { t } = useI18n();
@@ -28,16 +30,21 @@ const ChatPlayground = () => {
     const [currentSessionId, setCurrentSessionId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [isStreaming, setIsStreaming] = useState(false);
     const [showParams, setShowParams] = useState(false);
     const [params, setParams] = useState(DEFAULT_PARAMS);
     const [showSidebar, setShowSidebar] = useState(true);
     const [selectedImages, setSelectedImages] = useState([]);
+
+    // Version history state
+    const [messageVersions, setMessageVersions] = useState([]);
+    const [versionIndex, setVersionIndex] = useState(-1);
+    const [revertedAtIndex, setRevertedAtIndex] = useState(-1); // Index of the message that was edited
+
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    // Detect actual MIME type from base64 data
     const detectMimeType = (base64) => {
         const signatures = {
             '/9j/': 'image/jpeg',
@@ -52,20 +59,17 @@ const ChatPlayground = () => {
         return null;
     };
 
-    // Convert file to base64 with correct MIME type
     const fileToBase64 = (file) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = () => {
                 const result = reader.result;
-                // Extract the base64 part and detect actual MIME type
                 const base64Match = result.match(/^data:([^;]+);base64,(.+)$/);
                 if (base64Match) {
                     const base64Data = base64Match[2];
                     const detectedMime = detectMimeType(base64Data);
                     if (detectedMime && detectedMime !== base64Match[1]) {
-                        // Rebuild with correct MIME type
                         resolve(`data:${detectedMime};base64,${base64Data}`);
                     } else {
                         resolve(result);
@@ -78,11 +82,10 @@ const ChatPlayground = () => {
         });
     };
 
-    // Handle image selection
     const handleImageSelect = async (e) => {
         const files = Array.from(e.target.files);
         const maxFiles = 3;
-        const maxSize = 5 * 1024 * 1024; // 5MB
+        const maxSize = 5 * 1024 * 1024;
 
         const validFiles = files.filter(file => {
             if (file.size > maxSize) {
@@ -101,10 +104,9 @@ const ChatPlayground = () => {
         );
 
         setSelectedImages(prev => [...prev, ...newImages].slice(0, maxFiles));
-        e.target.value = ''; // Reset input
+        e.target.value = '';
     };
 
-    // Remove image from selection
     const handleRemoveImage = (index) => {
         setSelectedImages(prev => {
             const newImages = [...prev];
@@ -114,7 +116,6 @@ const ChatPlayground = () => {
         });
     };
 
-    // Build message content with images
     const buildMessageContent = (text, images) => {
         if (images.length === 0) {
             return text;
@@ -132,7 +133,6 @@ const ChatPlayground = () => {
         return content;
     };
 
-    // Load models on mount
     useEffect(() => {
         const loadModels = async () => {
             try {
@@ -148,85 +148,213 @@ const ChatPlayground = () => {
         loadModels();
     }, []);
 
-    // Load sessions on mount
     useEffect(() => {
-        const loadedSessions = getChatSessions();
-        setSessions(loadedSessions);
-        if (loadedSessions.length > 0) {
-            setCurrentSessionId(loadedSessions[0].id);
-            setMessages(loadedSessions[0].messages || []);
-            if (loadedSessions[0].model) {
-                setSelectedModel(loadedSessions[0].model);
+        const loadSessions = async () => {
+            setIsLoading(true);
+            try {
+                const loadedSessions = await getChatSessions();
+                setSessions(loadedSessions);
+                if (loadedSessions.length > 0) {
+                    setCurrentSessionId(loadedSessions[0].id);
+                    setMessages(loadedSessions[0].messages || []);
+                    if (loadedSessions[0].model) {
+                        setSelectedModel(loadedSessions[0].model);
+                    }
+                    if (loadedSessions[0].params) {
+                        setParams({ ...DEFAULT_PARAMS, ...loadedSessions[0].params });
+                    }
+                    // Load version history if exists
+                    if (loadedSessions[0].versions) {
+                        setMessageVersions(loadedSessions[0].versions);
+                        setVersionIndex(loadedSessions[0].versionIndex ?? loadedSessions[0].versions.length - 1);
+                        setRevertedAtIndex(loadedSessions[0].revertedAtIndex ?? -1);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load sessions:', e);
+            } finally {
+                setIsLoading(false);
             }
-            if (loadedSessions[0].params) {
-                setParams({ ...DEFAULT_PARAMS, ...loadedSessions[0].params });
-            }
-        }
+        };
+        loadSessions();
     }, []);
 
-    // Scroll to bottom on new messages
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const handleNewSession = () => {
-        const newSession = createChatSession();
-        setSessions([newSession, ...sessions]);
-        setCurrentSessionId(newSession.id);
-        setMessages([]);
-        setParams(DEFAULT_PARAMS);
-    };
-
-    const handleSelectSession = (sessionId) => {
-        const session = getChatSession(sessionId);
+    // Load version history when switching sessions
+    const handleSelectSession = async (sessionId) => {
+        const session = await getChatSession(sessionId);
         if (session) {
             setCurrentSessionId(sessionId);
             setMessages(session.messages || []);
             if (session.model) setSelectedModel(session.model);
             if (session.params) setParams({ ...DEFAULT_PARAMS, ...session.params });
-        }
-    };
-
-    const handleDeleteSession = (sessionId) => {
-        deleteChatSession(sessionId);
-        const updatedSessions = sessions.filter(s => s.id !== sessionId);
-        setSessions(updatedSessions);
-        if (currentSessionId === sessionId) {
-            if (updatedSessions.length > 0) {
-                handleSelectSession(updatedSessions[0].id);
+            // Load version history if exists
+            if (session.versions && session.versions.length > 0) {
+                setMessageVersions(session.versions);
+                setVersionIndex(session.versionIndex ?? session.versions.length - 1);
+                setRevertedAtIndex(session.revertedAtIndex ?? -1);
             } else {
-                setCurrentSessionId(null);
-                setMessages([]);
+                setMessageVersions([]);
+                setVersionIndex(-1);
+                setRevertedAtIndex(-1);
             }
         }
     };
 
-    const handleSend = async () => {
-        if ((!inputValue.trim() && selectedImages.length === 0) || isStreaming) return;
+    const handleNewSession = async () => {
+        const newSession = await createChatSession();
+        if (newSession) {
+            setSessions(prev => [newSession, ...prev]);
+            setCurrentSessionId(newSession.id);
+            setMessages([]);
+            setParams(DEFAULT_PARAMS);
+            // Reset version history
+            setMessageVersions([]);
+            setVersionIndex(-1);
+            setRevertedAtIndex(-1);
+        }
+    };
+
+    const handleDeleteSession = async (sessionId) => {
+        await deleteChatSession(sessionId);
+        const updatedSessions = sessions.filter(s => s.id !== sessionId);
+        setSessions(updatedSessions);
+        if (currentSessionId === sessionId) {
+            if (updatedSessions.length > 0) {
+                await handleSelectSession(updatedSessions[0].id);
+            } else {
+                setCurrentSessionId(null);
+                setMessages([]);
+                setMessageVersions([]);
+                setVersionIndex(-1);
+            }
+        }
+    };
+
+    // Save current state to version history (before edit)
+    const saveToVersionHistory = (currentMessages, editIndex) => {
+        if (currentMessages.length === 0) return;
+
+        setMessageVersions(prev => {
+            // If we're not at the end of history, truncate forward history
+            let newVersions = versionIndex >= 0 ? prev.slice(0, versionIndex + 1) : [...prev];
+
+            // Add current state (the state BEFORE edit)
+            newVersions.push({
+                messages: [...currentMessages],
+                timestamp: Date.now(),
+                editIndex: editIndex
+            });
+
+            // Limit to MAX_VERSIONS
+            if (newVersions.length > MAX_VERSIONS) {
+                newVersions = newVersions.slice(-MAX_VERSIONS);
+            }
+
+            return newVersions;
+        });
+
+        // Don't update versionIndex yet - it will be updated after new response is added
+        setRevertedAtIndex(editIndex);
+    };
+
+    // Add the new state (after edit) to version history and save to session
+    const addNewVersionToHistory = async (newMessages, editIndex, sessionId) => {
+        // Use Promise to get the updated versions from functional setState
+        const updatedVersions = await new Promise(resolve => {
+            setMessageVersions(prev => {
+                let newVersions = [...prev];
+
+                // Add new state (the state AFTER edit)
+                newVersions.push({
+                    messages: [...newMessages],
+                    timestamp: Date.now(),
+                    editIndex: editIndex
+                });
+
+                // Limit to MAX_VERSIONS
+                if (newVersions.length > MAX_VERSIONS) {
+                    newVersions = newVersions.slice(-MAX_VERSIONS);
+                }
+
+                // Resolve with the new versions after setState processes
+                setTimeout(() => resolve(newVersions), 0);
+                return newVersions;
+            });
+        });
+
+        const newIndex = updatedVersions.length - 1;
+        setVersionIndex(newIndex);
+
+        // Save versions to session storage
+        if (sessionId && updatedVersions.length > 0) {
+            await updateChatSession(sessionId, {
+                versions: updatedVersions,
+                versionIndex: newIndex,
+                revertedAtIndex: editIndex
+            });
+        }
+    };
+
+    // Navigate version history
+    const handleVersionNav = async (direction) => {
+        if (messageVersions.length === 0) return;
+
+        let newIndex;
+        if (direction === 'back') {
+            newIndex = Math.max(0, versionIndex - 1);
+        } else {
+            newIndex = Math.min(messageVersions.length - 1, versionIndex + 1);
+        }
+
+        if (newIndex !== versionIndex && messageVersions[newIndex]) {
+            setVersionIndex(newIndex);
+            const newMessages = [...messageVersions[newIndex].messages];
+            setMessages(newMessages);
+
+            // Save the navigation state to session
+            if (currentSessionId) {
+                await updateChatSession(currentSessionId, {
+                    messages: newMessages,
+                    versionIndex: newIndex
+                });
+            }
+        }
+    };
+
+    // Handle message edit
+    const handleEditMessage = async (index, newContent) => {
+        if (isStreaming) return;
+
+        // Save current state to history before editing
+        saveToVersionHistory(messages, index);
+
+        // Truncate messages to the edited message (keep messages before it)
+        const truncatedMessages = messages.slice(0, index);
+
+        // Create new user message with edited content
+        const editedMessage = {
+            role: 'user',
+            content: newContent
+        };
+
+        const newMessages = [...truncatedMessages, editedMessage];
+        setMessages(newMessages);
+        setIsStreaming(true);
 
         // Auto-create session if none exists
         let activeSessionId = currentSessionId;
         if (!activeSessionId) {
-            const newSession = createChatSession('New Chat');
-            setSessions(prev => [newSession, ...prev]);
-            setCurrentSessionId(newSession.id);
-            activeSessionId = newSession.id;
+            const newSession = await createChatSession('New Chat');
+            if (newSession) {
+                setSessions(prev => [newSession, ...prev]);
+                setCurrentSessionId(newSession.id);
+                activeSessionId = newSession.id;
+            }
         }
-
-        const messageContent = buildMessageContent(inputValue, selectedImages);
-        const userMessage = {
-            role: 'user',
-            content: messageContent
-        };
-
-        // Clear selected images
-        selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
-        setSelectedImages([]);
-
-        const newMessages = [...messages, userMessage];
-        setMessages(newMessages);
-        setInputValue('');
-        setIsStreaming(true);
 
         // Add assistant placeholder
         const assistantMessage = {
@@ -269,26 +397,119 @@ const ChatPlayground = () => {
             },
             async () => {
                 setIsStreaming(false);
-                // Save to session
                 const finalMessages = [...newMessages, { role: 'assistant', content: fullContent, reasoning: fullReasoning }];
 
-                // Auto-generate session name if it's the first exchange
+                // Add the new version to history after edit is complete and save to storage
+                await addNewVersionToHistory(finalMessages, index, activeSessionId);
+
+                await updateChatSession(activeSessionId, {
+                    messages: finalMessages,
+                    model: selectedModel,
+                    params
+                });
+                const updatedSessions = await getChatSessions();
+                setSessions(updatedSessions);
+            },
+            (error) => {
+                console.error('Stream error:', error);
+                setIsStreaming(false);
+                setMessages(prev => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                        role: 'assistant',
+                        content: `Error: ${error.message}`,
+                        reasoning: ''
+                    };
+                    return updated;
+                });
+            }
+        );
+    };
+
+    const handleSend = async () => {
+        if ((!inputValue.trim() && selectedImages.length === 0) || isStreaming) return;
+
+        let activeSessionId = currentSessionId;
+        if (!activeSessionId) {
+            const newSession = await createChatSession('New Chat');
+            if (newSession) {
+                setSessions(prev => [newSession, ...prev]);
+                setCurrentSessionId(newSession.id);
+                activeSessionId = newSession.id;
+            }
+        }
+
+        const messageContent = buildMessageContent(inputValue, selectedImages);
+        const userMessage = {
+            role: 'user',
+            content: messageContent
+        };
+
+        selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+        setSelectedImages([]);
+
+        const newMessages = [...messages, userMessage];
+        setMessages(newMessages);
+        setInputValue('');
+        setIsStreaming(true);
+
+        const assistantMessage = {
+            role: 'assistant',
+            content: '',
+            reasoning: ''
+        };
+        setMessages([...newMessages, assistantMessage]);
+
+        let fullContent = '';
+        let fullReasoning = '';
+
+        await streamChatCompletion(
+            newMessages,
+            selectedModel,
+            {
+                temperature: params.temperature,
+                max_tokens: params.max_tokens,
+                top_p: params.top_p,
+                ...(params.reasoning_effort !== 'none' && { reasoning_effort: params.reasoning_effort }),
+                ...(params.prompt_caching && { prompt_caching: true })
+            },
+            (chunk) => {
+                const delta = chunk.choices?.[0]?.delta;
+                if (delta?.content) {
+                    fullContent += delta.content;
+                }
+                if (delta?.reasoning_content) {
+                    fullReasoning += delta.reasoning_content;
+                }
+                setMessages(prev => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                        role: 'assistant',
+                        content: fullContent,
+                        reasoning: fullReasoning
+                    };
+                    return updated;
+                });
+            },
+            async () => {
+                setIsStreaming(false);
+                const finalMessages = [...newMessages, { role: 'assistant', content: fullContent, reasoning: fullReasoning }];
+
                 let sessionUpdate = {
                     messages: finalMessages,
                     model: selectedModel,
                     params
                 };
 
-                // Generate title from first user message (if session is new)
-                const session = getChatSession(activeSessionId);
+                const session = await getChatSession(activeSessionId);
                 if (session && (!session.messages || session.messages.length === 0)) {
-                    // Generate a short title based on the first message
                     const title = inputValue.trim().slice(0, 40) + (inputValue.length > 40 ? '...' : '');
                     sessionUpdate.name = title;
                 }
 
-                updateChatSession(activeSessionId, sessionUpdate);
-                setSessions(getChatSessions());
+                await updateChatSession(activeSessionId, sessionUpdate);
+                const updatedSessions = await getChatSessions();
+                setSessions(updatedSessions);
             },
             (error) => {
                 console.error('Stream error:', error);
@@ -314,10 +535,12 @@ const ChatPlayground = () => {
     };
 
     const canSend = (inputValue.trim() || selectedImages.length > 0) && !isStreaming;
+    const hasVersionHistory = messageVersions.length > 0;
+    const canGoBack = hasVersionHistory && versionIndex > 0;
+    const canGoForward = hasVersionHistory && versionIndex < messageVersions.length - 1;
 
     return (
         <div className="chat-playground">
-            {/* Sidebar toggle for mobile */}
             <button
                 className="sidebar-toggle btn-ghost"
                 onClick={() => setShowSidebar(!showSidebar)}
@@ -325,7 +548,6 @@ const ChatPlayground = () => {
                 ☰
             </button>
 
-            {/* Session History Sidebar */}
             <ChatSessionHistory
                 sessions={sessions}
                 currentSessionId={currentSessionId}
@@ -336,9 +558,7 @@ const ChatPlayground = () => {
                 onClose={() => setShowSidebar(false)}
             />
 
-            {/* Main Chat Area */}
             <div className="chat-main">
-                {/* Header */}
                 <div className="chat-header">
                     <select
                         className="model-select"
@@ -359,7 +579,6 @@ const ChatPlayground = () => {
                     </button>
                 </div>
 
-                {/* Messages */}
                 <div className="chat-messages">
                     {messages.length === 0 ? (
                         <div className="chat-empty">
@@ -369,17 +588,29 @@ const ChatPlayground = () => {
                         messages.map((msg, index) => (
                             <ChatMessage
                                 key={index}
+                                index={index}
                                 message={msg}
                                 isStreaming={isStreaming && index === messages.length - 1}
+                                onEdit={handleEditMessage}
+                                canEdit={!isStreaming && msg.role === 'user'}
+                                showVersionNav={hasVersionHistory && index === revertedAtIndex}
+                                versionInfo={{
+                                    current: versionIndex + 1,
+                                    total: messageVersions.length,
+                                    canGoBack: canGoBack && !isStreaming,
+                                    canGoForward: canGoForward && !isStreaming,
+                                    onBack: () => handleVersionNav('back'),
+                                    onForward: () => handleVersionNav('forward')
+                                }}
                             />
                         ))
                     )}
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Area */}
+
+
                 <div className="chat-input-area">
-                    {/* Hidden file input */}
                     <input
                         type="file"
                         ref={fileInputRef}
@@ -389,7 +620,6 @@ const ChatPlayground = () => {
                         style={{ display: 'none' }}
                     />
 
-                    {/* Image preview */}
                     {selectedImages.length > 0 && (
                         <div className="selected-images-preview">
                             {selectedImages.map((img, index) => (
@@ -408,7 +638,6 @@ const ChatPlayground = () => {
                     )}
 
                     <div className="input-row">
-                        {/* Upload button */}
                         <button
                             className="btn-icon image-upload-btn"
                             onClick={() => fileInputRef.current?.click()}
@@ -442,7 +671,6 @@ const ChatPlayground = () => {
                 </div>
             </div>
 
-            {/* Parameter Modal */}
             <ParameterModal
                 isOpen={showParams}
                 onClose={() => setShowParams(false)}

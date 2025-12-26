@@ -1,66 +1,58 @@
-// LocalStorage keys
-const CHAT_SESSIONS_KEY = 'playground_chat_sessions';
+import axiosClient from '../../api/axiosClient';
+
+// LocalStorage keys (for image gallery only)
 const IMAGE_GALLERY_KEY = 'playground_image_gallery';
 
-// Chat Sessions
-export const getChatSessions = () => {
+// ==================== Chat Sessions (API-based) ====================
+
+export const getChatSessions = async () => {
     try {
-        const data = localStorage.getItem(CHAT_SESSIONS_KEY);
-        return data ? JSON.parse(data) : [];
+        const response = await axiosClient.get('/admin/chat-sessions');
+        return response.success ? response.data : [];
     } catch (e) {
         console.error('Failed to get chat sessions:', e);
         return [];
     }
 };
 
-export const saveChatSessions = (sessions) => {
+export const createChatSession = async (name = 'New Chat') => {
     try {
-        localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(sessions));
+        const response = await axiosClient.post('/admin/chat-sessions', { name });
+        return response.success ? response.data : null;
     } catch (e) {
-        console.error('Failed to save chat sessions:', e);
+        console.error('Failed to create chat session:', e);
+        return null;
     }
 };
 
-export const createChatSession = (name = 'New Chat') => {
-    const session = {
-        id: Date.now().toString(),
-        name,
-        messages: [],
-        model: '',
-        params: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-    const sessions = getChatSessions();
-    sessions.unshift(session);
-    saveChatSessions(sessions);
-    return session;
-};
-
-export const getChatSession = (sessionId) => {
-    const sessions = getChatSessions();
-    return sessions.find(s => s.id === sessionId);
-};
-
-export const updateChatSession = (sessionId, updates) => {
-    const sessions = getChatSessions();
-    const index = sessions.findIndex(s => s.id === sessionId);
-    if (index !== -1) {
-        sessions[index] = {
-            ...sessions[index],
-            ...updates,
-            updatedAt: new Date().toISOString()
-        };
-        saveChatSessions(sessions);
-        return sessions[index];
+export const getChatSession = async (sessionId) => {
+    try {
+        const response = await axiosClient.get(`/admin/chat-sessions/${sessionId}`);
+        return response.success ? response.data : null;
+    } catch (e) {
+        console.error('Failed to get chat session:', e);
+        return null;
     }
-    return null;
 };
 
-export const deleteChatSession = (sessionId) => {
-    const sessions = getChatSessions();
-    const filtered = sessions.filter(s => s.id !== sessionId);
-    saveChatSessions(filtered);
+export const updateChatSession = async (sessionId, updates) => {
+    try {
+        const response = await axiosClient.put(`/admin/chat-sessions/${sessionId}`, updates);
+        return response.success ? response.data : null;
+    } catch (e) {
+        console.error('Failed to update chat session:', e);
+        return null;
+    }
+};
+
+export const deleteChatSession = async (sessionId) => {
+    try {
+        const response = await axiosClient.delete(`/admin/chat-sessions/${sessionId}`);
+        return response.success;
+    } catch (e) {
+        console.error('Failed to delete chat session:', e);
+        return false;
+    }
 };
 
 // Image Gallery

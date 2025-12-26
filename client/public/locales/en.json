@@ -209,6 +209,8 @@
         "generating": "Generating...",
         "tempHint": "Higher values = more creative",
         "reasoningHint": "Enable chain-of-thought reasoning",
+        "promptCaching": "Prompt Caching",
+        "promptCachingHint": "Cache conversation context for faster responses (Claude models)",
         "textToImage": "Text to Image",
         "imageToImage": "Image to Image",
         "gallery": "Gallery",
@@ -226,7 +228,12 @@
         "generationStarted": "Image generation started...",
         "generationComplete": "Image generated successfully!",
         "generationFailed": "Failed to generate image",
-        "clickToView": "Click to zoom"
+        "clickToView": "Click to zoom",
+        "editMessage": "Edit",
+        "saveEdit": "Save",
+        "cancelEdit": "Cancel",
+        "previousVersion": "Previous version",
+        "nextVersion": "Next version"
     },
     "common": {
         "cancel": "Cancel",
