@@ -12,6 +12,7 @@ import { getModelsWithQuotas } from '../api/client.js';
 import { getEnvPath } from '../utils/paths.js';
 import requestLogger from '../utils/requestLogger.js';
 import chatSessionStorage from '../utils/chatSessionStorage.js';
+import galleryStorage from '../utils/galleryStorage.js';
 import dotenv from 'dotenv';
 
 const envPath = getEnvPath();
@@ -408,6 +409,19 @@ router.delete('/history', authMiddleware, (req, res) => {
   }
 });
 
+// ==================== Dashboard ====================
+
+// Get dashboard statistics
+router.get('/dashboard', authMiddleware, (req, res) => {
+  try {
+    const dashboardData = requestLogger.getDashboardStats();
+    res.json({ success: true, data: dashboardData });
+  } catch (error) {
+    logger.error('Failed to get dashboard stats:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ==================== Chat Sessions ====================
 
 // Get all chat sessions
@@ -475,6 +489,49 @@ router.delete('/chat-sessions/:id', authMiddleware, (req, res) => {
     res.json({ success: true, message: 'Session deleted' });
   } catch (error) {
     logger.error('Failed to delete chat session:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Image Gallery ====================
+
+// Get all gallery images
+router.get('/gallery', authMiddleware, (req, res) => {
+  try {
+    const images = galleryStorage.getGalleryImages();
+    res.json({ success: true, data: images });
+  } catch (error) {
+    logger.error('Failed to get gallery images:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Add image to gallery
+router.post('/gallery', authMiddleware, (req, res) => {
+  try {
+    const { data, prompt, model } = req.body;
+    if (!data) {
+      return res.status(400).json({ success: false, message: 'Image data is required' });
+    }
+    const image = galleryStorage.addGalleryImage({ data, prompt, model });
+    res.json({ success: true, data: image });
+  } catch (error) {
+    logger.error('Failed to add gallery image:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete image from gallery
+router.delete('/gallery/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = galleryStorage.deleteGalleryImage(id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Image not found' });
+    }
+    res.json({ success: true, message: 'Image deleted' });
+  } catch (error) {
+    logger.error('Failed to delete gallery image:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });

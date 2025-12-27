@@ -4,7 +4,7 @@ import { VscSettingsGear, VscSend, VscClose, VscChevronLeft, VscChevronRight } f
 import ChatMessage from './ChatMessage';
 import ChatSessionHistory from './ChatSessionHistory';
 import ParameterModal from './ParameterModal';
-import { getChatModels, streamChatCompletion } from './playgroundService';
+import { getChatModels, streamChatCompletion, improveChatPrompt } from './playgroundService';
 import {
     getChatSessions,
     createChatSession,
@@ -35,6 +35,7 @@ const ChatPlayground = () => {
     const [showParams, setShowParams] = useState(false);
     const [params, setParams] = useState(DEFAULT_PARAMS);
     const [showSidebar, setShowSidebar] = useState(true);
+    const [isImproving, setIsImproving] = useState(false);
     const [selectedImages, setSelectedImages] = useState([]);
 
     // Version history state
@@ -537,6 +538,19 @@ const ChatPlayground = () => {
     const canSend = (inputValue.trim() || selectedImages.length > 0) && !isStreaming;
     const hasVersionHistory = messageVersions.length > 0;
     const canGoBack = hasVersionHistory && versionIndex > 0;
+
+    const handleImprovePrompt = async () => {
+        if (!inputValue.trim() || isImproving || isStreaming) return;
+        setIsImproving(true);
+        try {
+            const improved = await improveChatPrompt(inputValue);
+            setInputValue(improved);
+        } catch (error) {
+            console.error('Failed to improve prompt:', error);
+        } finally {
+            setIsImproving(false);
+        }
+    };
     const canGoForward = hasVersionHistory && versionIndex < messageVersions.length - 1;
 
     return (
@@ -651,15 +665,29 @@ const ChatPlayground = () => {
                             </svg>
                         </button>
 
-                        <textarea
-                            className="chat-input"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder={t('playground.typeMessage') || 'Type a message...'}
-                            disabled={isStreaming}
-                            rows={1}
-                        />
+                        <div className="chat-input-wrapper">
+                            <textarea
+                                className="chat-input"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder={t('playground.typeMessage') || 'Type a message...'}
+                                disabled={isStreaming}
+                                rows={1}
+                            />
+                            <button
+                                className="improve-prompt-btn"
+                                onClick={handleImprovePrompt}
+                                disabled={!inputValue.trim() || isImproving || isStreaming}
+                                title={t('playground.improvePrompt') || 'Improve prompt'}
+                            >
+                                {isImproving ? (
+                                    <span className="improve-spinner"></span>
+                                ) : (
+                                    <span className="improve-icon">✨</span>
+                                )}
+                            </button>
+                        </div>
                         <button
                             className="send-btn btn-primary"
                             onClick={handleSend}

@@ -8,6 +8,7 @@
     },
     "tabs": {
         "tokens": "Token",
+        "dashboard": "Dashboard",
         "settings": "Settings",
         "history": "History",
         "playground": "Playground"
@@ -233,11 +234,30 @@
         "saveEdit": "Save",
         "cancelEdit": "Cancel",
         "previousVersion": "Previous version",
-        "nextVersion": "Next version"
+        "nextVersion": "Next version",
+        "improvePrompt": "Improve prompt",
+        "improvingPrompt": "Improving...",
+        "referenceImages": "Reference Images",
+        "multiImageHint": "Use \"Image 1\", \"Image 2\" in your prompt to reference specific images",
+        "addImage": "Add Image",
+        "removeImage": "Remove image",
+        "image": "Image",
+        "multiImagePromptPlaceholder": "Describe your edit... e.g. \"Put the hat from Image 1 onto the person in Image 2\""
     },
     "common": {
         "cancel": "Cancel",
         "save": "Save",
         "delete": "Delete"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "hourlyUsage": "Hourly Token Usage",
+        "modelDistribution": "API Calls by Model",
+        "totalRequests": "Total Requests",
+        "totalTokens": "Total Tokens",
+        "successRate": "Success Rate",
+        "avgDuration": "Avg Duration",
+        "activeModels": "Active Models",
+        "noData": "No data available"
     }
 }

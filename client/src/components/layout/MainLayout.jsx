@@ -4,7 +4,7 @@ import { useI18n } from '../../context/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import LanguageSelector from '../common/LanguageSelector';
 import Dock from '../common/Dock';
-import { VscHome, VscSettingsGear, VscSignOut, VscColorMode, VscHistory, VscBeaker } from 'react-icons/vsc';
+import { VscHome, VscSettingsGear, VscSignOut, VscColorMode, VscHistory, VscBeaker, VscGraph } from 'react-icons/vsc';
 
 const MainLayout = () => {
     const { logout } = useAuth();
@@ -13,13 +13,15 @@ const MainLayout = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const activeTab = location.pathname.includes('settings')
-        ? 'settings'
-        : location.pathname.includes('history')
-            ? 'history'
-            : location.pathname.includes('playground')
-                ? 'playground'
-                : 'tokens';
+    const activeTab = location.pathname.includes('dashboard')
+        ? 'dashboard'
+        : location.pathname.includes('settings')
+            ? 'settings'
+            : location.pathname.includes('history')
+                ? 'history'
+                : location.pathname.includes('playground')
+                    ? 'playground'
+                    : 'tokens';
 
     const dockItems = [
         {
@@ -27,6 +29,12 @@ const MainLayout = () => {
             label: t('tabs.tokens'),
             onClick: () => navigate('/'),
             active: activeTab === 'tokens'
+        },
+        {
+            icon: <VscGraph size={20} />,
+            label: t('tabs.dashboard') || 'Dashboard',
+            onClick: () => navigate('/dashboard'),
+            active: activeTab === 'dashboard'
         },
         {
             icon: <VscHistory size={20} />,

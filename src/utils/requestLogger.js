@@ -1,9 +1,46 @@
 /**
- * Request Logger - Stores API call history
+ * Request Logger - Stores API call history with file persistence
  */
 
-const MAX_HISTORY_SIZE = 100;
-const requestHistory = [];
+import fs from 'fs';
+import path from 'path';
+import { getDataDir } from './paths.js';
+
+const DATA_DIR = getDataDir();
+const HISTORY_FILE = path.join(DATA_DIR, 'request_history.json');
+const MAX_HISTORY_SIZE = 500; // Increased for persistence
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Load history from file on startup
+let requestHistory = [];
+
+function loadHistory() {
+  try {
+    if (fs.existsSync(HISTORY_FILE)) {
+      const data = fs.readFileSync(HISTORY_FILE, 'utf-8');
+      requestHistory = JSON.parse(data);
+      console.log(`Loaded ${requestHistory.length} history records from file`);
+    }
+  } catch (e) {
+    console.error('Failed to load request history:', e);
+    requestHistory = [];
+  }
+}
+
+function saveHistory() {
+  try {
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(requestHistory, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Failed to save request history:', e);
+  }
+}
+
+// Load on module initialization
+loadHistory();
 
 /**
  * Log a request into history
@@ -32,6 +69,9 @@ export function logRequest(data) {
     requestHistory.pop();
   }
 
+  // Save to file
+  saveHistory();
+
   return record;
 }
 
@@ -49,6 +89,7 @@ export function getHistory(limit = MAX_HISTORY_SIZE) {
  */
 export function clearHistory() {
   requestHistory.length = 0;
+  saveHistory();
 }
 
 /**
@@ -70,9 +111,83 @@ export function getStats() {
   };
 }
 
+/**
+ * Get dashboard statistics for charts
+ * @returns {Object} Dashboard data with hourly usage and model breakdown
+ */
+export function getDashboardStats() {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  // Filter for today's records
+  const todayRecords = requestHistory.filter(r => r.timestamp >= startOfDay);
+
+  // Hourly token usage (0-23)
+  const hourlyUsage = Array(24).fill(null).map((_, hour) => ({
+    hour,
+    inputTokens: 0,
+    outputTokens: 0,
+    requests: 0
+  }));
+
+  // Model breakdown
+  const modelCounts = {};
+
+  todayRecords.forEach(record => {
+    // Aggregate hourly
+    const recordHour = new Date(record.timestamp).getHours();
+    hourlyUsage[recordHour].inputTokens += record.inputTokens || 0;
+    hourlyUsage[recordHour].outputTokens += record.outputTokens || 0;
+    hourlyUsage[recordHour].requests += 1;
+
+    // Aggregate by model
+    const modelName = record.model?.split('/').pop() || record.model || 'unknown';
+    if (!modelCounts[modelName]) {
+      modelCounts[modelName] = { calls: 0, inputTokens: 0, outputTokens: 0 };
+    }
+    modelCounts[modelName].calls += 1;
+    modelCounts[modelName].inputTokens += record.inputTokens || 0;
+    modelCounts[modelName].outputTokens += record.outputTokens || 0;
+  });
+
+  // Calculate summary stats
+  const totalTokens = todayRecords.reduce((sum, r) => sum + (r.inputTokens || 0) + (r.outputTokens || 0), 0);
+  const successCount = todayRecords.filter(r => r.status === 'success').length;
+  const successRate = todayRecords.length > 0 ? Math.round((successCount / todayRecords.length) * 100) : 0;
+  const totalDuration = todayRecords.reduce((sum, r) => sum + r.duration, 0);
+  const avgDuration = todayRecords.length > 0 ? Math.round(totalDuration / todayRecords.length) : 0;
+
+  // Convert modelCounts to array for chart
+  const modelBreakdown = Object.entries(modelCounts)
+    .map(([model, data]) => ({ model, ...data }))
+    .sort((a, b) => b.calls - a.calls);
+
+  return {
+    date: now.toISOString().split('T')[0],
+    hourlyUsage,
+    modelBreakdown,
+    summary: {
+      totalRequests: todayRecords.length,
+      totalTokens,
+      successRate,
+      avgDuration,
+      activeModels: modelBreakdown.length
+    }
+  };
+}
+
+/**
+ * Reload history from file (useful for external updates)
+ */
+export function reloadHistory() {
+  loadHistory();
+}
+
 export default {
   logRequest,
   getHistory,
   clearHistory,
-  getStats
+  getStats,
+  getDashboardStats,
+  reloadHistory
 };

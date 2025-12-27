@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { VscAdd, VscTrash, VscDesktopDownload, VscClose, VscCloudUpload } from 'react-icons/vsc';
 import ImageGallery from './ImageGallery';
 import ImageViewer from './ImageViewer';
-import { getImageModels, generateImage, transformImage } from './playgroundService';
+import { getImageModels, generateImage, transformImage, improveImagePrompt } from './playgroundService';
 import { addGalleryImage, getGalleryImages, deleteGalleryImage } from './storageService';
 import { addHistory } from '../history/historyService';
 
@@ -15,6 +15,9 @@ const IMAGE_SIZES = [
     { label: '4K', model: 'gemini-3-pro-image-4K', size: '4k' }
 ];
 
+// Gemini 3 Pro Image supports up to 14 reference images
+const MAX_IMAGES = 14;
+
 const ImagePlayground = () => {
     const { t } = useI18n();
     const { showToast } = useToast();
@@ -22,7 +25,8 @@ const ImagePlayground = () => {
     const [prompt, setPrompt] = useState('');
     const [models, setModels] = useState([]);
     const [selectedModel, setSelectedModel] = useState('');
-    const [uploadedImage, setUploadedImage] = useState(null);
+    // Changed from single uploadedImage to array of uploadedImages
+    const [uploadedImages, setUploadedImages] = useState([]);
     const [generatedImage, setGeneratedImage] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -31,6 +35,7 @@ const ImagePlayground = () => {
     const [showViewer, setShowViewer] = useState(false);
     const [generationQueue, setGenerationQueue] = useState([]); // Background queue
     const [generationProgress, setGenerationProgress] = useState(0);
+    const [isImproving, setIsImproving] = useState(false);
     const fileInputRef = useRef(null);
 
     // Load models and gallery on mount
@@ -44,44 +49,86 @@ const ImagePlayground = () => {
                     setSelectedModel(imageModels[0].id);
                 }
             } catch (err) {
-                console.error('Failed to load image models:', err);
+                console.error('Failed to load models:', err);
             }
-            setGallery(getGalleryImages());
+            // Load gallery images from server
+            try {
+                const galleryImages = await getGalleryImages();
+                setGallery(galleryImages);
+            } catch (err) {
+                console.error('Failed to load gallery:', err);
+            }
         };
         loadData();
     }, []);
 
+    // Handle file upload - now supports multiple files
     const handleFileUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (file) {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        const remainingSlots = MAX_IMAGES - uploadedImages.length;
+        const filesToProcess = files.slice(0, remainingSlots);
+
+        filesToProcess.forEach((file, index) => {
             const reader = new FileReader();
             reader.onload = (event) => {
                 const base64 = event.target.result.split(',')[1];
-                setUploadedImage({
+                const newImage = {
+                    id: Date.now() + index + Math.random(),
                     file,
                     base64,
                     preview: event.target.result
+                };
+                setUploadedImages(prev => {
+                    if (prev.length >= MAX_IMAGES) return prev;
+                    return [...prev, newImage];
                 });
             };
             reader.readAsDataURL(file);
+        });
+
+        // Reset file input to allow selecting same file again
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
+    };
+
+    // Remove a specific image by id
+    const handleRemoveImage = (imageId) => {
+        setUploadedImages(prev => prev.filter(img => img.id !== imageId));
+    };
+
+    // Build enhanced prompt with image labels
+    const buildEnhancedPrompt = (originalPrompt, imageCount) => {
+        if (imageCount === 0) return originalPrompt;
+
+        const imageLabels = Array.from({ length: imageCount }, (_, i) => `Image ${i + 1}`).join(', ');
+        return `[Reference images provided: ${imageLabels}]\n\nUser request: ${originalPrompt}`;
     };
 
     const handleGenerate = async () => {
         if (!prompt.trim() || !selectedModel) return;
-        if (mode === 'img2img' && !uploadedImage) {
-            setError(t('playground.uploadRequired') || 'Please upload an image first');
+        if (mode === 'img2img' && uploadedImages.length === 0) {
+            setError(t('playground.uploadRequired') || 'Please upload at least one image');
             return;
         }
 
         // Create generation task
         const taskId = Date.now();
+        // Get base64 data from all uploaded images in order
+        const uploadedBase64Array = uploadedImages.map(img => img.base64);
+        // Build enhanced prompt with image labels
+        const enhancedPrompt = mode === 'img2img'
+            ? buildEnhancedPrompt(prompt.trim(), uploadedImages.length)
+            : prompt.trim();
+
         const task = {
             id: taskId,
-            prompt: prompt.trim(),
+            prompt: enhancedPrompt,
             model: selectedModel,
             mode,
-            uploadedBase64: uploadedImage?.base64,
+            uploadedBase64Array,
             status: 'pending'
         };
 
@@ -104,7 +151,7 @@ const ImagePlayground = () => {
             if (mode === 'txt2img') {
                 result = await generateImage(task.prompt, task.model);
             } else {
-                result = await transformImage(task.prompt, [task.uploadedBase64], task.model);
+                result = await transformImage(task.prompt, task.uploadedBase64Array, task.model);
             }
 
             clearInterval(progressInterval);
@@ -113,14 +160,16 @@ const ImagePlayground = () => {
             if (result.images && result.images.length > 0) {
                 const newImage = {
                     data: result.images[0],
-                    prompt: task.prompt,
+                    prompt: prompt.trim(), // Store original prompt, not enhanced
                     model: task.model
                 };
                 setGeneratedImage(newImage);
 
-                // Auto-save to gallery
-                const saved = addGalleryImage(newImage);
-                setGallery(prev => [saved, ...prev.slice(0, 49)]);
+                // Auto-save to gallery (async)
+                const saved = await addGalleryImage(newImage);
+                if (saved) {
+                    setGallery(prev => [saved, ...prev.slice(0, 99)]);
+                }
 
                 showToast(t('playground.generationComplete') || 'Image generated successfully!', 'success');
             } else {
@@ -154,16 +203,20 @@ const ImagePlayground = () => {
         }
     };
 
-    const handleSaveToGallery = () => {
+    const handleSaveToGallery = async () => {
         if (generatedImage) {
-            const saved = addGalleryImage(generatedImage);
-            setGallery([saved, ...gallery.slice(0, 49)]);
+            const saved = await addGalleryImage(generatedImage);
+            if (saved) {
+                setGallery([saved, ...gallery.slice(0, 99)]);
+            }
         }
     };
 
-    const handleDeleteFromGallery = (imageId) => {
-        deleteGalleryImage(imageId);
-        setGallery(gallery.filter(img => img.id !== imageId));
+    const handleDeleteFromGallery = async (imageId) => {
+        const deleted = await deleteGalleryImage(imageId);
+        if (deleted) {
+            setGallery(gallery.filter(img => img.id !== imageId));
+        }
     };
 
     const handleDownload = () => {
@@ -184,10 +237,27 @@ const ImagePlayground = () => {
         // Set the generated image as input for img2img
         if (generatedImage) {
             setMode('img2img');
-            setUploadedImage({
+            // Add generated image to uploaded images array
+            const newImage = {
+                id: Date.now(),
                 base64: generatedImage.data,
                 preview: `data:image/png;base64,${generatedImage.data}`
-            });
+            };
+            setUploadedImages([newImage]);
+        }
+    };
+
+    const handleImprovePrompt = async () => {
+        if (!prompt.trim() || isImproving || isLoading) return;
+        setIsImproving(true);
+        try {
+            const improved = await improveImagePrompt(prompt);
+            setPrompt(improved);
+        } catch (error) {
+            console.error('Failed to improve prompt:', error);
+            showToast('Failed to improve prompt', 'error');
+        } finally {
+            setIsImproving(false);
         }
     };
 
@@ -242,51 +312,92 @@ const ImagePlayground = () => {
                     </select>
                 </div>
 
-                {/* Image Upload for img2img */}
+                {/* Image Upload for img2img - Now supports multiple images */}
                 {mode === 'img2img' && (
-                    <div className="image-upload-area">
+                    <div className="multi-image-upload-area">
                         <input
                             type="file"
                             ref={fileInputRef}
                             accept="image/*"
+                            multiple
                             onChange={handleFileUpload}
                             style={{ display: 'none' }}
                         />
-                        {uploadedImage ? (
-                            <div className="uploaded-preview">
-                                <img src={uploadedImage.preview} alt="Uploaded" />
+
+                        <div className="upload-header">
+                            <span className="upload-title">
+                                {t('playground.referenceImages') || 'Reference Images'}
+                                <span className="image-count">({uploadedImages.length}/{MAX_IMAGES})</span>
+                            </span>
+                            <span className="upload-hint">
+                                {t('playground.multiImageHint') || 'Use "Image 1", "Image 2" in your prompt to reference specific images'}
+                            </span>
+                        </div>
+
+                        <div className="multi-image-grid">
+                            {/* Display uploaded images with labels */}
+                            {uploadedImages.map((img, index) => (
+                                <div key={img.id} className="uploaded-image-item">
+                                    <img src={img.preview} alt={`Image ${index + 1}`} />
+                                    <span className="image-label-badge">
+                                        {t('playground.image') || 'Image'} {index + 1}
+                                    </span>
+                                    <button
+                                        className="btn-icon remove-image-btn"
+                                        onClick={() => handleRemoveImage(img.id)}
+                                        title={t('playground.removeImage') || 'Remove image'}
+                                    >
+                                        <VscClose size={14} />
+                                    </button>
+                                </div>
+                            ))}
+
+                            {/* Add image button - only show if under max limit */}
+                            {uploadedImages.length < MAX_IMAGES && (
                                 <button
-                                    className="btn-icon remove-image"
-                                    onClick={() => setUploadedImage(null)}
+                                    className="add-image-btn"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    title={t('playground.addImage') || 'Add image'}
                                 >
-                                    <VscClose size={16} />
+                                    <VscCloudUpload size={24} />
+                                    <span>{t('playground.addImage') || 'Add Image'}</span>
                                 </button>
-                            </div>
-                        ) : (
-                            <button
-                                className="upload-btn"
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <VscCloudUpload size={32} />
-                                <span>{t('playground.uploadImage') || 'Upload Image'}</span>
-                            </button>
-                        )}
+                            )}
+                        </div>
                     </div>
                 )}
 
                 {/* Prompt Input */}
                 <div className="prompt-input-area">
-                    <textarea
-                        className="prompt-input"
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder={t('playground.enterPrompt') || 'Describe the image you want to generate...'}
-                        rows={3}
-                    />
+                    <div className="prompt-input-wrapper">
+                        <textarea
+                            className="prompt-input"
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            placeholder={
+                                mode === 'img2img'
+                                    ? (t('playground.multiImagePromptPlaceholder') || 'Describe your edit... e.g. "Put the hat from Image 1 onto the person in Image 2"')
+                                    : (t('playground.enterPrompt') || 'Describe the image you want to generate...')
+                            }
+                            rows={3}
+                        />
+                        <button
+                            className="improve-prompt-btn image-improve-btn"
+                            onClick={handleImprovePrompt}
+                            disabled={!prompt.trim() || isImproving || isLoading}
+                            title={t('playground.improvePrompt') || 'Improve prompt'}
+                        >
+                            {isImproving ? (
+                                <span className="improve-spinner"></span>
+                            ) : (
+                                <span className="improve-icon">✨</span>
+                            )}
+                        </button>
+                    </div>
                     <button
                         className="generate-btn btn-primary"
                         onClick={handleGenerate}
-                        disabled={isLoading || !prompt.trim() || (mode === 'img2img' && !uploadedImage)}
+                        disabled={isLoading || !prompt.trim() || (mode === 'img2img' && uploadedImages.length === 0)}
                     >
                         {isLoading ? (
                             <span className="loading-spinner"></span>

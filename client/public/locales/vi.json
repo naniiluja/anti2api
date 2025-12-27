@@ -233,7 +233,15 @@
         "saveEdit": "Lưu",
         "cancelEdit": "Hủy",
         "previousVersion": "Phiên bản trước",
-        "nextVersion": "Phiên bản sau"
+        "nextVersion": "Phiên bản sau",
+        "improvePrompt": "Cải thiện prompt",
+        "improvingPrompt": "Đang cải thiện...",
+        "referenceImages": "Hình ảnh tham chiếu",
+        "multiImageHint": "Sử dụng \"Hình 1\", \"Hình 2\" trong prompt để tham chiếu hình ảnh cụ thể",
+        "addImage": "Thêm hình",
+        "removeImage": "Xóa hình",
+        "image": "Hình",
+        "multiImagePromptPlaceholder": "Mô tả chỉnh sửa của bạn... ví dụ: \"Đặt chiếc mũ từ Hình 1 lên người ở Hình 2\""
     },
     "common": {
         "cancel": "Hủy",
