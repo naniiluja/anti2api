@@ -5,6 +5,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import { closeRequester } from '../api/client.js';
 import logger from '../utils/logger.js';
@@ -21,6 +22,7 @@ import sdRouter from '../routes/sd.js';
 import openaiRouter from '../routes/openai.js';
 import geminiRouter from '../routes/gemini.js';
 import claudeRouter from '../routes/claude.js';
+import { verifyToken } from '../auth/jwt.js';
 
 const publicDir = getPublicDir();
 
@@ -34,6 +36,7 @@ memoryManager.start(MEMORY_CHECK_INTERVAL);
 
 // ==================== Base Middleware ====================
 app.use(cors());
+app.use(compression()); // Gzip compression for responses
 app.use(express.json({ limit: config.security.maxRequestSize }));
 
 // Static file serving
@@ -69,25 +72,57 @@ app.use((req, res, next) => {
 app.use('/sdapi/v1', sdRouter);
 
 // ==================== API Key Validation Middleware ====================
+// Validates API Key or JWT token for /v1/* and /v1beta/* routes
+const validateApiAuth = (req, res, next) => {
+  const apiKey = config.security?.apiKey;
+
+  // Skip validation if no API_KEY configured
+  if (!apiKey) return next();
+
+  const authHeader = req.headers.authorization || req.headers['x-api-key'];
+  const providedKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
+  // Check if it's a valid API Key
+  if (providedKey === apiKey) return next();
+
+  // Check if it's a valid JWT token (for admin users)
+  if (providedKey) {
+    try {
+      verifyToken(providedKey);
+      return next(); // Valid JWT, allow access
+    } catch (e) {
+      // Not a valid JWT, continue to reject
+    }
+  }
+
+  logger.warn(`API Key validation failed: ${req.method} ${req.path} (Provided Key: ${providedKey ? providedKey.substring(0, 10) + '...' : 'none'})`);
+  return res.status(401).json({ error: 'Invalid API Key' });
+};
+
 app.use((req, res, next) => {
   if (req.path.startsWith('/v1/')) {
-    const apiKey = config.security?.apiKey;
-    if (apiKey) {
-      const authHeader = req.headers.authorization || req.headers['x-api-key'];
-      const providedKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
-      if (providedKey !== apiKey) {
-        logger.warn(`API Key validation failed: ${req.method} ${req.path} (Provided Key: ${providedKey ? providedKey.substring(0, 10) + '...' : 'none'})`);
-        return res.status(401).json({ error: 'Invalid API Key' });
-      }
-    }
+    return validateApiAuth(req, res, next);
   } else if (req.path.startsWith('/v1beta/')) {
     const apiKey = config.security?.apiKey;
     if (apiKey) {
+      // Check query param or header for Gemini-style API key
       const providedKey = req.query.key || req.headers['x-goog-api-key'];
-      if (providedKey !== apiKey) {
-        logger.warn(`API Key validation failed: ${req.method} ${req.path} (Provided Key: ${providedKey ? providedKey.substring(0, 10) + '...' : 'none'})`);
-        return res.status(401).json({ error: 'Invalid API Key' });
+      if (providedKey === apiKey) return next();
+
+      // Also check Authorization header for JWT token
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (bearerToken) {
+        try {
+          verifyToken(bearerToken);
+          return next(); // Valid JWT, allow access
+        } catch (e) {
+          // Not a valid JWT
+        }
       }
+
+      logger.warn(`API Key validation failed: ${req.method} ${req.path} (Provided Key: ${providedKey ? providedKey.substring(0, 10) + '...' : 'none'})`);
+      return res.status(401).json({ error: 'Invalid API Key' });
     }
   }
   next();

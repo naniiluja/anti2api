@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +28,6 @@ if (fs.existsSync(envPath)) {
 
   if (updated) {
     fs.writeFileSync(envPath, envContent, 'utf8');
-    console.log('✓ Environment variables synced to .env');
+    logger.info('Environment variables synced to .env');
   }
 }

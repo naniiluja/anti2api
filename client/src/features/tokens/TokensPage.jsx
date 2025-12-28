@@ -6,10 +6,12 @@ import OAuthModal from './OAuthModal';
 import ChromaGrid from '../../components/common/ChromaGrid';
 import { useI18n } from '../../context/I18nContext';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 const TokensPage = () => {
     const { t } = useI18n();
     const { showToast } = useToast();
+    const { isAuthenticated } = useAuth();
     const [tokens, setTokens] = useState([]);
     const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState(localStorage.getItem('tokenFilter') || 'all');
@@ -20,8 +22,10 @@ const TokensPage = () => {
     const [isOAuthModalOpen, setIsOAuthModalOpen] = useState(false);
 
     useEffect(() => {
-        loadTokens();
-    }, []);
+        if (isAuthenticated) {
+            loadTokens();
+        }
+    }, [isAuthenticated]);
 
     const loadTokens = async () => {
         setLoading(true);

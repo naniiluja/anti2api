@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './paths.js';
+import logger from './logger.js';
 
 const DATA_DIR = getDataDir();
 const SESSIONS_FILE = path.join(DATA_DIR, 'chat_sessions.json');
@@ -27,7 +28,7 @@ export function getChatSessions() {
         const data = fs.readFileSync(SESSIONS_FILE, 'utf-8');
         return JSON.parse(data);
     } catch (e) {
-        console.error('Failed to read chat sessions:', e);
+        logger.error('Failed to read chat sessions:', e.message);
         return [];
     }
 }
@@ -40,7 +41,7 @@ export function saveChatSessions(sessions) {
     try {
         fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2), 'utf-8');
     } catch (e) {
-        console.error('Failed to save chat sessions:', e);
+        logger.error('Failed to save chat sessions:', e.message);
         throw e;
     }
 }

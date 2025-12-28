@@ -5,6 +5,7 @@ import { BentoCard, BentoGrid } from '../../components/ui/MagicBento';
 import CountUp from '../../components/ui/CountUp';
 import { useI18n } from '../../context/I18nContext';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 // Chart Colors
 const CHART_COLORS = [
@@ -150,6 +151,7 @@ const StatCard = ({ icon, label, value, suffix = '', color = 'default' }) => (
 const DashboardPage = () => {
     const { t } = useI18n();
     const { showToast } = useToast();
+    const { isAuthenticated } = useAuth();
 
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -169,12 +171,14 @@ const DashboardPage = () => {
     };
 
     useEffect(() => {
-        loadDashboard();
+        if (isAuthenticated) {
+            loadDashboard();
 
-        // Auto-refresh every 30 seconds
-        const interval = setInterval(loadDashboard, 30000);
-        return () => clearInterval(interval);
-    }, []);
+            // Auto-refresh every 30 seconds
+            const interval = setInterval(loadDashboard, 30000);
+            return () => clearInterval(interval);
+        }
+    }, [isAuthenticated]);
 
     const maxTokenValue = useMemo(() => {
         if (!data?.hourlyUsage) return 0;

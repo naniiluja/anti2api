@@ -75,7 +75,7 @@ if (config.useNativeAxios === true) {
   try {
     requester = new AntigravityRequester();
   } catch (error) {
-    console.warn('AntigravityRequester initialization failed, falling back to axios:', error.message);
+    logger.warn('AntigravityRequester initialization failed, falling back to axios:', error.message);
     useAxios = true;
   }
 }

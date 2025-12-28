@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './paths.js';
+import logger from './logger.js';
 
 const DATA_DIR = getDataDir();
 const HISTORY_FILE = path.join(DATA_DIR, 'request_history.json');
@@ -23,10 +24,10 @@ function loadHistory() {
     if (fs.existsSync(HISTORY_FILE)) {
       const data = fs.readFileSync(HISTORY_FILE, 'utf-8');
       requestHistory = JSON.parse(data);
-      console.log(`Loaded ${requestHistory.length} history records from file`);
+      logger.info(`Loaded ${requestHistory.length} history records from file`);
     }
   } catch (e) {
-    console.error('Failed to load request history:', e);
+    logger.error('Failed to load request history:', e.message);
     requestHistory = [];
   }
 }
@@ -35,7 +36,7 @@ function saveHistory() {
   try {
     fs.writeFileSync(HISTORY_FILE, JSON.stringify(requestHistory, null, 2), 'utf-8');
   } catch (e) {
-    console.error('Failed to save request history:', e);
+    logger.error('Failed to save request history:', e.message);
   }
 }
 

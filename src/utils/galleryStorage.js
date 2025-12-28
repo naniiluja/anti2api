@@ -8,6 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './paths.js';
+import logger from './logger.js';
 
 const DATA_DIR = getDataDir();
 const GALLERY_DIR = path.join(DATA_DIR, 'gallery');
@@ -42,7 +43,7 @@ export function getGalleryImages() {
             return item;
         }).filter(item => item.data); // Only return items with valid data
     } catch (e) {
-        console.error('Failed to read gallery:', e);
+        logger.error('Failed to read gallery:', e.message);
         return [];
     }
 }
@@ -88,7 +89,7 @@ export function addGalleryImage(image) {
 
         return { ...newEntry, data: image.data };
     } catch (e) {
-        console.error('Failed to save gallery image:', e);
+        logger.error('Failed to save gallery image:', e.message);
         throw e;
     }
 }
@@ -114,7 +115,7 @@ export function deleteGalleryImage(imageId) {
         }
         return false;
     } catch (e) {
-        console.error('Failed to delete gallery image:', e);
+        logger.error('Failed to delete gallery image:', e.message);
         return false;
     }
 }

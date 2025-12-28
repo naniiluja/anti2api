@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import logger from './utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -72,7 +73,7 @@ class antigravityRequester {
 
         // Check if file exists
         if (!fs.existsSync(requester_execPath)) {
-            console.warn(`Binary not found at: ${requester_execPath}`);
+            logger.warn(`Binary not found at: ${requester_execPath}`);
         }
 
         // Set execution permissions (non-Windows platforms)
@@ -80,7 +81,7 @@ class antigravityRequester {
             try {
                 fs.chmodSync(requester_execPath, 0o755);
             } catch (error) {
-                console.warn(`Could not set executable permissions: ${error.message}`);
+                logger.warn(`Could not set executable permissions: ${error.message}`);
             }
         }
         return requester_execPath;
@@ -109,7 +110,7 @@ class antigravityRequester {
 
             // Buffer size monitoring (warning only, no limit, image responses can be large)
             if (!this.bufferWarned && this.buffer.length > BUFFER_WARNING_SIZE) {
-                console.warn(`AntigravityRequester: Large buffer (${Math.round(this.buffer.length / 1024 / 1024)}MB), possibly a large response`);
+                logger.warn(`AntigravityRequester: Large buffer (${Math.round(this.buffer.length / 1024 / 1024)}MB), possibly a large response`);
                 this.bufferWarned = true;
             }
 
@@ -157,7 +158,7 @@ class antigravityRequester {
         });
 
         this.proc.stderr.on('data', (data) => {
-            console.error('antigravityRequester stderr:', data.toString());
+            logger.error('antigravityRequester stderr:', data.toString());
         });
 
         this.proc.on('close', () => {
@@ -240,7 +241,7 @@ class antigravityRequester {
                 }
             });
         }).catch(err => {
-            console.error('Write request failed:', err);
+            logger.error('Write request failed:', err.message);
         });
     }
 
