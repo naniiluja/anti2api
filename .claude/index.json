@@ -1,0 +1,157 @@
+{
+  "projectName": "anti2api",
+  "description": "Antigravity to OpenAI API Proxy Service - A proxy service converting Google Antigravity API to OpenAI-compatible format",
+  "version": "1.0.0",
+  "timestamp": "2025-12-27T22:22:57.000Z",
+  "language": "JavaScript (Node.js + React)",
+  "frameworks": ["Express.js", "React", "Vite"],
+
+  "coverage": {
+    "totalFiles": 150,
+    "scannedFiles": 85,
+    "coveragePercentage": 56.67,
+    "modules": {
+      "root": {
+        "scanned": true,
+        "coverage": 90,
+        "gaps": []
+      },
+      "src": {
+        "scanned": true,
+        "coverage": 85,
+        "gaps": ["Some handler details", "Binary requester internals"]
+      },
+      "client": {
+        "scanned": true,
+        "coverage": 70,
+        "gaps": ["Some component styling details", "i18n translation files"]
+      },
+      "scripts": {
+        "scanned": true,
+        "coverage": 80,
+        "gaps": []
+      }
+    }
+  },
+
+  "ignored": {
+    "patterns": [
+      "node_modules/**",
+      ".git/**",
+      ".github/**",
+      "dist/**",
+      "build/**",
+      ".next/**",
+      "__pycache__/**",
+      "*.lock",
+      "*.log",
+      "*.bin",
+      "*.pdf",
+      "*.png",
+      "*.jpg",
+      "*.jpeg",
+      "*.gif",
+      "*.mp4",
+      "*.zip",
+      "*.tar",
+      "*.gz",
+      "data/**",
+      "test/*.png",
+      "test/*.jpeg",
+      "public/images/**",
+      "logs/**"
+    ],
+    "totalIgnoredFiles": 12000,
+    "reasons": {
+      "node_modules": "Third-party dependencies",
+      ".git": "Version control metadata",
+      "dist": "Build output",
+      "data": "Runtime data storage",
+      "public/images": "Generated images"
+    }
+  },
+
+  "modules": [
+    {
+      "name": "root",
+      "path": "D:\\anti2api",
+      "type": "project-root",
+      "language": "Node.js",
+      "entryPoints": [
+        "src/server/index.js"
+      ],
+      "documentation": "D:\\anti2api\\CLAUDE.md"
+    },
+    {
+      "name": "backend",
+      "path": "D:\\anti2api\\src",
+      "type": "backend-module",
+      "language": "JavaScript (ES6 Modules)",
+      "entryPoints": [
+        "server/index.js"
+      ],
+      "submodules": [
+        "server",
+        "routes",
+        "auth",
+        "api",
+        "utils",
+        "config",
+        "constants"
+      ],
+      "keyFiles": [
+        "server/index.js",
+        "auth/token_manager.js",
+        "api/client.js",
+        "routes/openai.js",
+        "routes/claude.js",
+        "routes/gemini.js",
+        "routes/sd.js",
+        "routes/admin.js"
+      ],
+      "documentation": "D:\\anti2api\\src\\CLAUDE.md"
+    },
+    {
+      "name": "frontend",
+      "path": "D:\\anti2api\\client",
+      "type": "frontend-module",
+      "language": "React + JSX",
+      "framework": "Vite + React 19",
+      "entryPoints": [
+        "src/main.jsx"
+      ],
+      "keyDirectories": [
+        "src/features",
+        "src/components",
+        "src/context",
+        "src/routes"
+      ],
+      "keyFiles": [
+        "src/App.jsx",
+        "src/main.jsx",
+        "src/routes/AppRoutes.jsx",
+        "vite.config.js"
+      ],
+      "documentation": "D:\\anti2api\\client\\CLAUDE.md"
+    },
+    {
+      "name": "scripts",
+      "path": "D:\\anti2api\\scripts",
+      "type": "utility-module",
+      "language": "JavaScript",
+      "files": [
+        "build.js",
+        "oauth-server.js",
+        "refresh-tokens.js"
+      ],
+      "documentation": "D:\\anti2api\\scripts\\CLAUDE.md"
+    }
+  ],
+
+  "truncated": false,
+  "nextSteps": [
+    "Read detailed implementation of binary requester (src/bin/antigravity_requester_*)",
+    "Review i18n translation files (client/public/locales/*.json)",
+    "Analyze GitHub Actions workflows (.github/workflows/*)"
+  ]
+}

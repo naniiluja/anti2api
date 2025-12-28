@@ -114,14 +114,25 @@ export function getStats() {
 
 /**
  * Get dashboard statistics for charts
+ * @param {string} dateStr - Optional date string in YYYY-MM-DD format, defaults to today
  * @returns {Object} Dashboard data with hourly usage and model breakdown
  */
-export function getDashboardStats() {
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+export function getDashboardStats(dateStr = null) {
+  let targetDate;
 
-  // Filter for today's records
-  const todayRecords = requestHistory.filter(r => r.timestamp >= startOfDay);
+  if (dateStr) {
+    // Parse the date string (YYYY-MM-DD)
+    const [year, month, day] = dateStr.split('-').map(Number);
+    targetDate = new Date(year, month - 1, day);
+  } else {
+    targetDate = new Date();
+  }
+
+  const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
+  const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+
+  // Filter for target day's records
+  const dayRecords = requestHistory.filter(r => r.timestamp >= startOfDay && r.timestamp < endOfDay);
 
   // Hourly token usage (0-23)
   const hourlyUsage = Array(24).fill(null).map((_, hour) => ({
@@ -134,7 +145,7 @@ export function getDashboardStats() {
   // Model breakdown
   const modelCounts = {};
 
-  todayRecords.forEach(record => {
+  dayRecords.forEach(record => {
     // Aggregate hourly
     const recordHour = new Date(record.timestamp).getHours();
     hourlyUsage[recordHour].inputTokens += record.inputTokens || 0;
@@ -152,29 +163,49 @@ export function getDashboardStats() {
   });
 
   // Calculate summary stats
-  const totalTokens = todayRecords.reduce((sum, r) => sum + (r.inputTokens || 0) + (r.outputTokens || 0), 0);
-  const successCount = todayRecords.filter(r => r.status === 'success').length;
-  const successRate = todayRecords.length > 0 ? Math.round((successCount / todayRecords.length) * 100) : 0;
-  const totalDuration = todayRecords.reduce((sum, r) => sum + r.duration, 0);
-  const avgDuration = todayRecords.length > 0 ? Math.round(totalDuration / todayRecords.length) : 0;
+  const totalTokens = dayRecords.reduce((sum, r) => sum + (r.inputTokens || 0) + (r.outputTokens || 0), 0);
+  const successCount = dayRecords.filter(r => r.status === 'success').length;
+  const successRate = dayRecords.length > 0 ? Math.round((successCount / dayRecords.length) * 100) : 0;
+  const totalDuration = dayRecords.reduce((sum, r) => sum + r.duration, 0);
+  const avgDuration = dayRecords.length > 0 ? Math.round(totalDuration / dayRecords.length) : 0;
 
   // Convert modelCounts to array for chart
   const modelBreakdown = Object.entries(modelCounts)
     .map(([model, data]) => ({ model, ...data }))
     .sort((a, b) => b.calls - a.calls);
 
+  // Format date for display
+  const displayDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+
   return {
-    date: now.toISOString().split('T')[0],
+    date: displayDate,
     hourlyUsage,
     modelBreakdown,
     summary: {
-      totalRequests: todayRecords.length,
+      totalRequests: dayRecords.length,
       totalTokens,
       successRate,
       avgDuration,
       activeModels: modelBreakdown.length
     }
   };
+}
+
+/**
+ * Get list of dates that have data available
+ * @returns {Array} List of dates with data in YYYY-MM-DD format
+ */
+export function getAvailableDates() {
+  const datesSet = new Set();
+
+  requestHistory.forEach(record => {
+    const date = new Date(record.timestamp);
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    datesSet.add(dateStr);
+  });
+
+  // Sort dates in descending order (newest first)
+  return Array.from(datesSet).sort((a, b) => b.localeCompare(a));
 }
 
 /**
@@ -190,5 +221,7 @@ export default {
   clearHistory,
   getStats,
   getDashboardStats,
+  getAvailableDates,
   reloadHistory
 };
+

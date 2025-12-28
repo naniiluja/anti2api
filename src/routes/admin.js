@@ -414,10 +414,22 @@ router.delete('/history', authMiddleware, (req, res) => {
 // Get dashboard statistics
 router.get('/dashboard', authMiddleware, (req, res) => {
   try {
-    const dashboardData = requestLogger.getDashboardStats();
+    const date = req.query.date || null; // Optional date in YYYY-MM-DD format
+    const dashboardData = requestLogger.getDashboardStats(date);
     res.json({ success: true, data: dashboardData });
   } catch (error) {
     logger.error('Failed to get dashboard stats:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get available dates for dashboard
+router.get('/dashboard/dates', authMiddleware, (req, res) => {
+  try {
+    const dates = requestLogger.getAvailableDates();
+    res.json({ success: true, data: dates });
+  } catch (error) {
+    logger.error('Failed to get available dates:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });

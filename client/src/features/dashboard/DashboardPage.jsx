@@ -20,6 +20,8 @@ const CHART_COLORS = [
 ];
 
 // Bar Chart Component
+const BAR_MAX_HEIGHT = 180; // pixels
+
 const BarChart = ({ data, maxValue }) => {
     const currentHour = new Date().getHours();
 
@@ -27,9 +29,8 @@ const BarChart = ({ data, maxValue }) => {
         <div className="bar-chart">
             <div className="bar-chart-bars">
                 {data.map((item, index) => {
-                    const totalTokens = item.inputTokens + item.outputTokens;
-                    const heightPercent = maxValue > 0 ? (totalTokens / maxValue) * 100 : 0;
-                    const inputPercent = totalTokens > 0 ? (item.inputTokens / totalTokens) * 100 : 0;
+                    const inputHeight = maxValue > 0 ? (item.inputTokens / maxValue) * BAR_MAX_HEIGHT : 0;
+                    const outputHeight = maxValue > 0 ? (item.outputTokens / maxValue) * BAR_MAX_HEIGHT : 0;
 
                     return (
                         <div
@@ -37,16 +38,24 @@ const BarChart = ({ data, maxValue }) => {
                             className={`bar-wrapper ${index === currentHour ? 'current' : ''}`}
                             title={`${item.hour}:00 - Input: ${item.inputTokens.toLocaleString()}, Output: ${item.outputTokens.toLocaleString()}`}
                         >
-                            <div
-                                className="bar"
-                                style={{ height: `${Math.max(heightPercent, totalTokens > 0 ? 5 : 0)}%` }}
-                            >
-                                <div
-                                    className="bar-input"
-                                    style={{ height: `${inputPercent}%` }}
-                                />
+                            <div className="bar-stack">
+                                {/* Input on top (green) */}
+                                {item.inputTokens > 0 && (
+                                    <div
+                                        className="bar-segment bar-input"
+                                        style={{ height: `${Math.max(inputHeight, 4)}px` }}
+                                    />
+                                )}
+                                {/* Output on bottom (purple) */}
+                                {item.outputTokens > 0 && (
+                                    <div
+                                        className="bar-segment bar-output"
+                                        style={{ height: `${Math.max(outputHeight, 4)}px` }}
+                                    />
+                                )}
                             </div>
-                            {index % 4 === 0 && (
+                            {/* Show label every 3 hours */}
+                            {index % 3 === 0 && (
                                 <span className="bar-label">{item.hour}</span>
                             )}
                         </div>
@@ -155,11 +164,24 @@ const DashboardPage = () => {
 
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(null); // null = today
+    const [availableDates, setAvailableDates] = useState([]);
 
-    const loadDashboard = async () => {
+    const loadAvailableDates = async () => {
+        try {
+            const res = await dashboardService.getAvailableDates();
+            if (res.success && res.data) {
+                setAvailableDates(res.data);
+            }
+        } catch (err) {
+            console.error('Failed to load available dates:', err);
+        }
+    };
+
+    const loadDashboard = async (date = selectedDate) => {
         setLoading(true);
         try {
-            const res = await dashboardService.getDashboardData();
+            const res = await dashboardService.getDashboardData(date);
             if (res.success && res.data) {
                 setData(res.data);
             }
@@ -170,12 +192,40 @@ const DashboardPage = () => {
         }
     };
 
+    const handleDateChange = (e) => {
+        const newDate = e.target.value || null;
+        setSelectedDate(newDate);
+        loadDashboard(newDate);
+    };
+
+    const navigateDate = (direction) => {
+        if (!availableDates.length) return;
+
+        const currentIndex = selectedDate
+            ? availableDates.indexOf(selectedDate)
+            : 0; // Today is index 0 (newest)
+
+        const newIndex = direction === 'prev'
+            ? Math.min(currentIndex + 1, availableDates.length - 1)
+            : Math.max(currentIndex - 1, 0);
+
+        const newDate = availableDates[newIndex];
+        setSelectedDate(newDate);
+        loadDashboard(newDate);
+    };
+
     useEffect(() => {
         if (isAuthenticated) {
+            loadAvailableDates();
             loadDashboard();
 
-            // Auto-refresh every 30 seconds
-            const interval = setInterval(loadDashboard, 30000);
+            // Auto-refresh every 30 seconds only for today
+            const interval = setInterval(() => {
+                if (!selectedDate) {
+                    loadDashboard();
+                    loadAvailableDates();
+                }
+            }, 30000);
             return () => clearInterval(interval);
         }
     }, [isAuthenticated]);
@@ -185,18 +235,52 @@ const DashboardPage = () => {
         return Math.max(...data.hourlyUsage.map(h => h.inputTokens + h.outputTokens));
     }, [data]);
 
+    // Get today's date for comparison
+    const today = new Date().toISOString().split('T')[0];
+    const isToday = !selectedDate || selectedDate === today;
+    const canGoPrev = availableDates.length > 0 && (selectedDate !== availableDates[availableDates.length - 1]);
+    const canGoNext = availableDates.length > 0 && selectedDate && selectedDate !== availableDates[0];
+
     return (
         <div id="dashboardPage">
             <div className="top-bar">
                 <div className="dashboard-title">
                     <VscGraph size={20} />
                     <h2>{t('dashboard.title') || 'Dashboard'}</h2>
-                    {data && <span className="dashboard-date">{data.date}</span>}
                 </div>
-                <div className="action-btns">
+                <div className="dashboard-controls">
+                    <div className="date-picker-group">
+                        <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => navigateDate('prev')}
+                            disabled={!canGoPrev || loading}
+                            title="Previous day"
+                        >
+                            ◀
+                        </button>
+                        <select
+                            className="date-select"
+                            value={selectedDate || ''}
+                            onChange={handleDateChange}
+                            disabled={loading}
+                        >
+                            <option value="">{t('dashboard.today') || 'Today'} ({today})</option>
+                            {availableDates.filter(d => d !== today).map(date => (
+                                <option key={date} value={date}>{date}</option>
+                            ))}
+                        </select>
+                        <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => navigateDate('next')}
+                            disabled={!canGoNext || loading}
+                            title="Next day"
+                        >
+                            ▶
+                        </button>
+                    </div>
                     <button
                         className="btn btn-secondary btn-sm"
-                        onClick={loadDashboard}
+                        onClick={() => loadDashboard()}
                         disabled={loading}
                     >
                         <VscRefresh size={14} className={loading ? 'spinning' : ''} />

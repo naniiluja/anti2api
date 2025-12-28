@@ -251,6 +251,7 @@
     },
     "dashboard": {
         "title": "Dashboard",
+        "today": "Today",
         "hourlyUsage": "Hourly Token Usage",
         "modelDistribution": "API Calls by Model",
         "totalRequests": "Total Requests",
