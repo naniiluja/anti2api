@@ -259,12 +259,12 @@ async function fetchRawModels(headers, token) {
 }
 
 export async function getAvailableModels() {
-  // Cache disabled to ensure token rotation on every request
-  // const now = Date.now();
-  // const ttl = getModelCacheTTL();
-  // if (modelListCache && (now - modelListCacheTime) < ttl) {
-  //   return modelListCache;
-  // }
+  // Short-lived cache (60s) to balance performance and token rotation
+  const now = Date.now();
+  const cacheTTL = 60 * 1000; // 60 seconds
+  if (modelListCache && (now - modelListCacheTime) < cacheTTL) {
+    return modelListCache;
+  }
 
   const token = await tokenManager.getToken();
   if (!token) {
@@ -309,8 +309,7 @@ export async function getAvailableModels() {
   // Update cache
   modelListCache = result;
   modelListCacheTime = now;
-  const currentTTL = getModelCacheTTL();
-  logger.info(`Model list cached (TTL: ${currentTTL / 1000}s, model count: ${modelList.length})`);
+  logger.info(`Model list cached (TTL: 60s, model count: ${modelList.length})`);
 
   return result;
 }
