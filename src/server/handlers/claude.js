@@ -10,6 +10,7 @@ import { buildClaudeErrorPayload } from '../../utils/errors.js';
 import logger from '../../utils/logger.js';
 import config from '../../config/config.js';
 import tokenManager from '../../auth/token_manager.js';
+import requestLogger from '../../utils/requestLogger.js';
 import {
   setStreamHeaders,
   createHeartbeat,
@@ -110,6 +111,9 @@ export const createClaudeResponse = (id, model, content, reasoning, reasoningSig
  */
 export const handleClaudeRequest = async (req, res, isStream) => {
   const { messages, model, system, tools, ...rawParams } = req.body;
+  const startTime = Date.now();
+  let tokenId = null;
+  let usageData = null;
 
   try {
     if (!messages) {
@@ -120,6 +124,7 @@ export const handleClaudeRequest = async (req, res, isStream) => {
     if (!token) {
       throw new Error('No available token. Please run npm run login to get a token');
     }
+    tokenId = token.refresh_token?.substring(0, 8) || 'unknown';
 
     // Use unified parameter normalization module to handle Claude format parameters
     const parameters = normalizeClaudeParameters(rawParams);
@@ -324,6 +329,18 @@ export const handleClaudeRequest = async (req, res, isStream) => {
 
         clearInterval(heartbeatTimer);
         res.end();
+
+        // Log success for streaming
+        requestLogger.logRequest({
+          model,
+          tokenId,
+          status: 'success',
+          statusCode: 200,
+          duration: Date.now() - startTime,
+          inputTokens: usageData?.prompt_tokens || 0,
+          outputTokens: usageData?.completion_tokens || 0,
+          isStream: true
+        });
       } catch (error) {
         clearInterval(heartbeatTimer);
         if (!res.writableEnded) {
@@ -358,11 +375,37 @@ export const handleClaudeRequest = async (req, res, isStream) => {
       );
 
       res.json(response);
+
+      // Log success for non-streaming
+      requestLogger.logRequest({
+        model,
+        tokenId,
+        status: 'success',
+        statusCode: 200,
+        duration: Date.now() - startTime,
+        inputTokens: usage?.prompt_tokens || 0,
+        outputTokens: usage?.completion_tokens || 0,
+        isStream: false
+      });
     }
   } catch (error) {
     logger.error('Claude request failed:', error.message);
-    if (res.headersSent) return;
     const statusCode = error.statusCode || error.status || 500;
+
+    // Log error
+    requestLogger.logRequest({
+      model,
+      tokenId,
+      status: 'error',
+      statusCode,
+      duration: Date.now() - startTime,
+      inputTokens: 0,
+      outputTokens: 0,
+      errorMessage: error.message,
+      isStream
+    });
+
+    if (res.headersSent) return;
     res.status(statusCode).json(buildClaudeErrorPayload(error, statusCode));
   }
 };

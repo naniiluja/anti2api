@@ -152,8 +152,10 @@ function claudeMessageToAntigravity(claudeMessages, enableThinking, actualModelN
  * @returns {Object} Generated request body
  */
 export function generateClaudeRequestBody(claudeMessages, modelName, parameters, claudeTools, systemPrompt, token) {
-  const enableThinking = isEnableThinking(modelName);
+  // IMPORTANT: Map model first, then check thinking based on mapped model
   const actualModelName = modelMapping(modelName);
+  // Prioritize thinking_budget from request (Claude API thinking parameter) over model name check
+  const enableThinking = (parameters.thinking_budget !== undefined && parameters.thinking_budget > 0) || isEnableThinking(actualModelName);
   const mergedSystem = mergeSystemInstruction(config.systemInstruction || '', systemPrompt);
 
   return buildRequestBody({

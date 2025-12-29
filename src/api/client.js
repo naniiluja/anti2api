@@ -259,12 +259,12 @@ async function fetchRawModels(headers, token) {
 }
 
 export async function getAvailableModels() {
-  // Check if cache is valid (dynamic TTL)
-  const now = Date.now();
-  const ttl = getModelCacheTTL();
-  if (modelListCache && (now - modelListCacheTime) < ttl) {
-    return modelListCache;
-  }
+  // Cache disabled to ensure token rotation on every request
+  // const now = Date.now();
+  // const ttl = getModelCacheTTL();
+  // if (modelListCache && (now - modelListCacheTime) < ttl) {
+  //   return modelListCache;
+  // }
 
   const token = await tokenManager.getToken();
   if (!token) {

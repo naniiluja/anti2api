@@ -1,6 +1,7 @@
 // Utility functions
 import config from '../config/config.js';
 import os from 'os';
+import logger from './logger.js';
 import { REASONING_EFFORT_MAP, DEFAULT_STOP_SEQUENCES } from '../constants/index.js';
 import { toGenerationConfig } from './parameterNormalizer.js';
 
@@ -55,10 +56,40 @@ export function cleanParameters(obj) {
 }
 
 // ==================== Model Mapping ====================
+// Based on actual Gemini-supported models:
+// Claude: claude-opus-4-5-thinking, claude-sonnet-4-5, claude-sonnet-4-5-thinking, claude-opus-4-5
+// Gemini: gemini-3-pro-high, gemini-3-flash, gemini-3-pro-low, gemini-2.5-pro, gemini-2.5-flash
+
+const CLAUDE_MODEL_MAP = {
+  // Claude 4.5 opus -> thinking variant
+  'claude-opus-4-5': 'claude-opus-4-5-thinking',
+  'claude-opus-4-5-20251101': 'claude-opus-4-5-thinking',
+  
+  // Claude 4.5 haiku -> claude-sonnet-4-5 (haiku not available)
+  'claude-haiku-4-5': 'claude-sonnet-4-5',
+  'claude-haiku-4-5-20251001': 'claude-sonnet-4-5',
+  'claude-haiku-4-5-20251015': 'claude-sonnet-4-5',
+  
+  // Claude 4.5 sonnet -> keep as is (supported)
+  'claude-sonnet-4-5-20250929': 'claude-sonnet-4-5',
+  
+  // Thinking variants -> base model
+  'claude-sonnet-4-5-thinking': 'claude-sonnet-4-5-thinking',
+};
+
 export function modelMapping(modelName) {
-  if (modelName === 'claude-sonnet-4-5-thinking') return 'claude-sonnet-4-5';
-  if (modelName === 'claude-opus-4-5') return 'claude-opus-4-5-thinking';
-  if (modelName === 'gemini-2.5-flash-thinking') return 'gemini-2.5-flash';
+  // Check if model needs mapping
+  if (modelName && CLAUDE_MODEL_MAP[modelName]) {
+    const mapped = CLAUDE_MODEL_MAP[modelName];
+    logger.info(`Model mapping: ${modelName} -> ${mapped}`);
+    return mapped;
+  }
+  
+  // Log unmapped models for debugging
+  if (modelName && modelName.includes('claude')) {
+    logger.info(`Model passthrough (no mapping): ${modelName}`);
+  }
+  
   return modelName;
 }
 
@@ -66,6 +97,7 @@ export function isEnableThinking(modelName) {
   return modelName.includes('-thinking') ||
     modelName === 'gemini-2.5-pro' ||
     modelName.startsWith('gemini-3-pro-') ||
+    modelName === 'claude-opus-4-5-thinking' ||
     modelName === 'rev19-uic3-1p' ||
     modelName === 'gpt-oss-120b-medium';
 }

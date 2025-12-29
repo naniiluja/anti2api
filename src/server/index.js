@@ -128,16 +128,18 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // ==================== API Routes ====================
 
-// OpenAI compatible API
+// Claude compatible API (must be before OpenAI for /v1/models Anthropic format)
+// Handles /v1/messages and /v1/models for Claude Code CLI
+app.use('/v1', claudeRouter);
+
+// OpenAI compatible API (handles /v1/chat/completions, /v1/models as fallback)
 app.use('/v1', openaiRouter);
 
 // Gemini compatible API
 app.use('/v1beta', geminiRouter);
-
-// Claude compatible API (/v1/messages handled by claudeRouter)
-app.use('/v1', claudeRouter);
 
 // ==================== System Endpoints ====================
 
