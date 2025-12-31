@@ -13,6 +13,7 @@ import { getEnvPath } from '../utils/paths.js';
 import requestLogger from '../utils/requestLogger.js';
 import chatSessionStorage from '../utils/chatSessionStorage.js';
 import galleryStorage from '../utils/galleryStorage.js';
+import { webSearch } from '../utils/webSearchService.js';
 import dotenv from 'dotenv';
 
 const envPath = getEnvPath();
@@ -544,6 +545,30 @@ router.delete('/gallery/:id', authMiddleware, (req, res) => {
     res.json({ success: true, message: 'Image deleted' });
   } catch (error) {
     logger.error('Failed to delete gallery image:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Web Search ====================
+
+// Web search using DuckDuckGo
+router.post('/web-search', authMiddleware, async (req, res) => {
+  try {
+    const { query, maxResults = 5 } = req.body;
+    
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ success: false, message: 'Query is required' });
+    }
+
+    // Limit query length
+    if (query.length > 500) {
+      return res.status(400).json({ success: false, message: 'Query too long (max 500 chars)' });
+    }
+
+    const results = await webSearch(query, { maxResults: Math.min(maxResults, 10) });
+    res.json({ success: true, data: results });
+  } catch (error) {
+    logger.error('Web search failed:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });

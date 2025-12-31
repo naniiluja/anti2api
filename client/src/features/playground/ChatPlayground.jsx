@@ -4,7 +4,7 @@ import { VscSettingsGear, VscSend, VscClose, VscChevronLeft, VscChevronRight } f
 import ChatMessage from './ChatMessage';
 import ChatSessionHistory from './ChatSessionHistory';
 import ParameterModal from './ParameterModal';
-import { getChatModels, streamChatCompletion, improveChatPrompt } from './playgroundService';
+import { getChatModels, streamChatCompletion, improveChatPrompt, webSearch, getWebSearchTool, formatSearchResults } from './playgroundService';
 import {
     getChatSessions,
     createChatSession,
@@ -37,6 +37,8 @@ const ChatPlayground = () => {
     const [showSidebar, setShowSidebar] = useState(true);
     const [isImproving, setIsImproving] = useState(false);
     const [selectedImages, setSelectedImages] = useState([]);
+    const [enableWebSearch, setEnableWebSearch] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
 
     // Version history state
     const [messageVersions, setMessageVersions] = useState([]);
@@ -342,8 +344,8 @@ const ChatPlayground = () => {
             content: newContent
         };
 
-        const newMessages = [...truncatedMessages, editedMessage];
-        setMessages(newMessages);
+        let currentMessages = [...truncatedMessages, editedMessage];
+        setMessages(currentMessages);
         setIsStreaming(true);
 
         // Auto-create session if none exists
@@ -358,73 +360,237 @@ const ChatPlayground = () => {
         }
 
         // Add assistant placeholder
-        const assistantMessage = {
-            role: 'assistant',
-            content: '',
-            reasoning: ''
-        };
-        setMessages([...newMessages, assistantMessage]);
+        setMessages([...currentMessages, { role: 'assistant', content: '', reasoning: '' }]);
 
+        try {
+            let result = await executeStreamWithToolSupport(currentMessages, activeSessionId, newContent);
+
+            // Handle tool calls loop (max 3 iterations)
+            let iterations = 0;
+            const maxIterations = 3;
+            let collectedWebSearch = null;
+
+            while (result.toolCalls.length > 0 && iterations < maxIterations) {
+                iterations++;
+
+                const assistantWithTools = {
+                    role: 'assistant',
+                    content: result.content || null,
+                    tool_calls: result.toolCalls
+                };
+                currentMessages = [...currentMessages, assistantWithTools];
+
+                const toolResults = [];
+                for (const toolCall of result.toolCalls) {
+                    if (toolCall.function.name === 'web_search') {
+                        let searchQuery = '';
+                        try {
+                            const args = JSON.parse(toolCall.function.arguments);
+                            searchQuery = args.query || '';
+                        } catch { }
+
+                        setMessages(prev => {
+                            const updated = [...prev];
+                            updated[updated.length - 1] = {
+                                role: 'assistant',
+                                content: '',
+                                reasoning: '',
+                                webSearch: { query: searchQuery, isSearching: true, results: [] }
+                            };
+                            return updated;
+                        });
+
+                        const searchResult = await executeWebSearchTool(toolCall);
+
+                        if (searchResult.success && searchResult.rawResults) {
+                            collectedWebSearch = {
+                                query: searchResult.query,
+                                results: searchResult.rawResults
+                            };
+                        }
+
+                        toolResults.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: searchResult.success
+                                ? `Web search results:\n\n${searchResult.data}`
+                                : `Search failed: ${searchResult.error}`
+                        });
+                    }
+                }
+
+                currentMessages = [...currentMessages, ...toolResults];
+                setMessages([...currentMessages, {
+                    role: 'assistant',
+                    content: '',
+                    reasoning: '',
+                    webSearch: collectedWebSearch ? { ...collectedWebSearch, isSearching: false } : null
+                }]);
+
+                result = await executeStreamWithToolSupport(currentMessages, activeSessionId, newContent, collectedWebSearch);
+            }
+
+            setIsStreaming(false);
+            const finalAssistantMessage = {
+                role: 'assistant',
+                content: result.content,
+                reasoning: result.reasoning
+            };
+
+            if (collectedWebSearch) {
+                finalAssistantMessage.webSearch = collectedWebSearch;
+            }
+
+            const finalMessages = [...currentMessages, finalAssistantMessage];
+            setMessages(finalMessages);
+
+            // Add the new version to history after edit is complete
+            await addNewVersionToHistory(finalMessages, index, activeSessionId);
+
+            await updateChatSession(activeSessionId, {
+                messages: finalMessages,
+                model: selectedModel,
+                params
+            });
+            const updatedSessions = await getChatSessions();
+            setSessions(updatedSessions);
+
+        } catch (error) {
+            console.error('Stream error:', error);
+            setIsStreaming(false);
+            setIsSearching(false);
+            setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                    role: 'assistant',
+                    content: `Error: ${error.message}`,
+                    reasoning: ''
+                };
+                return updated;
+            });
+        }
+    };
+
+    // Helper function to execute a single chat completion with tool call support
+    const executeStreamWithToolSupport = async (messagesToSend, activeSessionId, originalInput, webSearchInfo = null) => {
         let fullContent = '';
         let fullReasoning = '';
+        let pendingToolCalls = [];
 
-        await streamChatCompletion(
-            newMessages,
-            selectedModel,
-            {
-                temperature: params.temperature,
-                max_tokens: params.max_tokens,
-                top_p: params.top_p,
-                ...(params.reasoning_effort !== 'none' && { reasoning_effort: params.reasoning_effort }),
-                ...(params.prompt_caching && { prompt_caching: true })
-            },
-            (chunk) => {
-                const delta = chunk.choices?.[0]?.delta;
-                if (delta?.content) {
-                    fullContent += delta.content;
+        console.log('[WebSearch Debug] enableWebSearch:', enableWebSearch);
+
+        const requestParams = {
+            temperature: params.temperature,
+            max_tokens: params.max_tokens,
+            top_p: params.top_p,
+            ...(params.reasoning_effort !== 'none' && { reasoning_effort: params.reasoning_effort }),
+            ...(params.prompt_caching && { prompt_caching: true }),
+            ...(enableWebSearch && { tools: [getWebSearchTool()] })
+        };
+
+        console.log('[WebSearch Debug] requestParams.tools:', requestParams.tools);
+
+        return new Promise((resolve, reject) => {
+            streamChatCompletion(
+                messagesToSend,
+                selectedModel,
+                requestParams,
+                (chunk) => {
+                    const delta = chunk.choices?.[0]?.delta;
+                    const finishReason = chunk.choices?.[0]?.finish_reason;
+
+                    if (delta?.content) {
+                        fullContent += delta.content;
+                    }
+                    if (delta?.reasoning_content) {
+                        fullReasoning += delta.reasoning_content;
+                    }
+
+                    // Collect tool calls
+                    if (delta?.tool_calls) {
+                        for (const tc of delta.tool_calls) {
+                            const idx = tc.index ?? 0;
+                            if (!pendingToolCalls[idx]) {
+                                pendingToolCalls[idx] = {
+                                    id: tc.id || `call_${idx}`,
+                                    type: 'function',
+                                    function: { name: '', arguments: '' }
+                                };
+                            }
+                            if (tc.function?.name) {
+                                pendingToolCalls[idx].function.name = tc.function.name;
+                            }
+                            if (tc.function?.arguments) {
+                                pendingToolCalls[idx].function.arguments += tc.function.arguments;
+                            }
+                            if (tc.id) {
+                                pendingToolCalls[idx].id = tc.id;
+                            }
+                        }
+                    }
+
+                    // Update UI with current content (preserve webSearch info)
+                    setMessages(prev => {
+                        const updated = [...prev];
+                        updated[updated.length - 1] = {
+                            role: 'assistant',
+                            content: fullContent,
+                            reasoning: fullReasoning,
+                            ...(pendingToolCalls.length > 0 && { tool_calls: pendingToolCalls }),
+                            ...(webSearchInfo && { webSearch: { ...webSearchInfo, isSearching: false } })
+                        };
+                        return updated;
+                    });
+                },
+                () => {
+                    resolve({ content: fullContent, reasoning: fullReasoning, toolCalls: pendingToolCalls.filter(Boolean) });
+                },
+                (error) => {
+                    reject(error);
                 }
-                if (delta?.reasoning_content) {
-                    fullReasoning += delta.reasoning_content;
-                }
-                setMessages(prev => {
-                    const updated = [...prev];
-                    updated[updated.length - 1] = {
-                        role: 'assistant',
-                        content: fullContent,
-                        reasoning: fullReasoning
-                    };
-                    return updated;
-                });
-            },
-            async () => {
-                setIsStreaming(false);
-                const finalMessages = [...newMessages, { role: 'assistant', content: fullContent, reasoning: fullReasoning }];
+            );
+        });
+    };
 
-                // Add the new version to history after edit is complete and save to storage
-                await addNewVersionToHistory(finalMessages, index, activeSessionId);
+    // Handle web search tool execution
+    const executeWebSearchTool = async (toolCall) => {
+        try {
+            const args = JSON.parse(toolCall.function.arguments);
+            const query = args.query;
 
-                await updateChatSession(activeSessionId, {
-                    messages: finalMessages,
-                    model: selectedModel,
-                    params
-                });
-                const updatedSessions = await getChatSessions();
-                setSessions(updatedSessions);
-            },
-            (error) => {
-                console.error('Stream error:', error);
-                setIsStreaming(false);
-                setMessages(prev => {
-                    const updated = [...prev];
-                    updated[updated.length - 1] = {
-                        role: 'assistant',
-                        content: `Error: ${error.message}`,
-                        reasoning: ''
-                    };
-                    return updated;
-                });
+            if (!query) {
+                return { success: false, error: 'No query provided' };
             }
-        );
+
+            setIsSearching(true);
+            const result = await webSearch(query);
+            setIsSearching(false);
+
+            console.log('[WebSearch Debug] webSearch result:', result);
+
+            // Handle both formats: { success, data } or direct array
+            let rawResults = [];
+            if (result.success && result.data) {
+                rawResults = result.data;
+            } else if (Array.isArray(result)) {
+                rawResults = result;
+            }
+
+            if (rawResults.length > 0) {
+                return {
+                    success: true,
+                    data: formatSearchResults(rawResults),
+                    rawResults: rawResults,
+                    query: query
+                };
+            } else {
+                return { success: false, error: result.message || 'No results found' };
+            }
+        } catch (error) {
+            setIsSearching(false);
+            console.error('[WebSearch Debug] executeWebSearchTool error:', error);
+            return { success: false, error: error.message };
+        }
     };
 
     const handleSend = async () => {
@@ -446,86 +612,176 @@ const ChatPlayground = () => {
             content: messageContent
         };
 
+        const originalInput = inputValue;
         selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
         setSelectedImages([]);
 
-        const newMessages = [...messages, userMessage];
-        setMessages(newMessages);
+        let currentMessages = [...messages, userMessage];
+        setMessages(currentMessages);
         setInputValue('');
         setIsStreaming(true);
 
+        // Add assistant placeholder
         const assistantMessage = {
             role: 'assistant',
             content: '',
             reasoning: ''
         };
-        setMessages([...newMessages, assistantMessage]);
+        setMessages([...currentMessages, assistantMessage]);
 
-        let fullContent = '';
-        let fullReasoning = '';
+        try {
+            let result = await executeStreamWithToolSupport(currentMessages, activeSessionId, originalInput);
 
-        await streamChatCompletion(
-            newMessages,
-            selectedModel,
-            {
-                temperature: params.temperature,
-                max_tokens: params.max_tokens,
-                top_p: params.top_p,
-                ...(params.reasoning_effort !== 'none' && { reasoning_effort: params.reasoning_effort }),
-                ...(params.prompt_caching && { prompt_caching: true })
-            },
-            (chunk) => {
-                const delta = chunk.choices?.[0]?.delta;
-                if (delta?.content) {
-                    fullContent += delta.content;
-                }
-                if (delta?.reasoning_content) {
-                    fullReasoning += delta.reasoning_content;
-                }
-                setMessages(prev => {
-                    const updated = [...prev];
-                    updated[updated.length - 1] = {
-                        role: 'assistant',
-                        content: fullContent,
-                        reasoning: fullReasoning
-                    };
-                    return updated;
-                });
-            },
-            async () => {
-                setIsStreaming(false);
-                const finalMessages = [...newMessages, { role: 'assistant', content: fullContent, reasoning: fullReasoning }];
+            // Handle tool calls loop (max 3 iterations to prevent infinite loops)
+            let iterations = 0;
+            const maxIterations = 3;
+            let collectedWebSearch = null; // Collect web search info for display
+            let collectedReasoning = result.reasoning || ''; // Collect reasoning from all iterations
 
-                let sessionUpdate = {
-                    messages: finalMessages,
-                    model: selectedModel,
-                    params
+            while (result.toolCalls.length > 0 && iterations < maxIterations) {
+                iterations++;
+
+                // Add assistant message with tool calls
+                const assistantWithTools = {
+                    role: 'assistant',
+                    content: result.content || null,
+                    tool_calls: result.toolCalls
                 };
+                currentMessages = [...currentMessages, assistantWithTools];
 
-                const session = await getChatSession(activeSessionId);
-                if (session && (!session.messages || session.messages.length === 0)) {
-                    const title = inputValue.trim().slice(0, 40) + (inputValue.length > 40 ? '...' : '');
-                    sessionUpdate.name = title;
+                // Execute each tool call and collect results
+                const toolResults = [];
+                for (const toolCall of result.toolCalls) {
+                    if (toolCall.function.name === 'web_search') {
+                        // Parse query first to show in UI
+                        let searchQuery = '';
+                        try {
+                            const args = JSON.parse(toolCall.function.arguments);
+                            searchQuery = args.query || '';
+                        } catch { }
+
+                        // Update UI to show searching state (keep collected reasoning)
+                        setMessages(prev => {
+                            const updated = [...prev];
+                            updated[updated.length - 1] = {
+                                role: 'assistant',
+                                content: '',
+                                reasoning: collectedReasoning,
+                                webSearch: {
+                                    query: searchQuery,
+                                    isSearching: true,
+                                    results: []
+                                }
+                            };
+                            return updated;
+                        });
+
+                        const searchResult = await executeWebSearchTool(toolCall);
+
+                        // Collect web search info for UI display
+                        if (searchResult.success && searchResult.rawResults) {
+                            collectedWebSearch = {
+                                query: searchResult.query,
+                                results: searchResult.rawResults
+                            };
+                        }
+
+                        toolResults.push({
+                            role: 'tool',
+                            tool_call_id: toolCall.id,
+                            content: searchResult.success
+                                ? `Web search results:\n\n${searchResult.data}`
+                                : `Search failed: ${searchResult.error}`
+                        });
+                    }
                 }
 
-                await updateChatSession(activeSessionId, sessionUpdate);
-                const updatedSessions = await getChatSessions();
-                setSessions(updatedSessions);
-            },
-            (error) => {
-                console.error('Stream error:', error);
-                setIsStreaming(false);
-                setMessages(prev => {
-                    const updated = [...prev];
-                    updated[updated.length - 1] = {
-                        role: 'assistant',
-                        content: `Error: ${error.message}`,
-                        reasoning: ''
-                    };
-                    return updated;
+                // Add tool results to messages
+                currentMessages = [...currentMessages, ...toolResults];
+
+                // Update UI to show we're continuing (keep webSearch info and reasoning visible)
+                setMessages([...currentMessages, {
+                    role: 'assistant',
+                    content: '',
+                    reasoning: collectedReasoning,
+                    webSearch: collectedWebSearch ? { ...collectedWebSearch, isSearching: false } : null
+                }]);
+
+                // Continue streaming with tool results
+                console.log('[WebSearch Debug] Sending tool results to LLM:', toolResults.length, 'results');
+                console.log('[WebSearch Debug] Full messages array being sent:', JSON.stringify(currentMessages.map(m => ({
+                    role: m.role,
+                    content: typeof m.content === 'string' ? m.content?.substring(0, 100) : m.content,
+                    tool_calls: m.tool_calls,
+                    tool_call_id: m.tool_call_id
+                })), null, 2));
+                result = await executeStreamWithToolSupport(currentMessages, activeSessionId, originalInput, collectedWebSearch);
+
+                // Accumulate reasoning from subsequent iterations
+                if (result.reasoning) {
+                    collectedReasoning = collectedReasoning ? collectedReasoning + '\n\n' + result.reasoning : result.reasoning;
+                }
+
+                console.log('[WebSearch Debug] LLM response after tool results:', {
+                    contentLength: result.content?.length,
+                    hasToolCalls: result.toolCalls?.length > 0,
+                    content: result.content?.substring(0, 200)
                 });
             }
-        );
+
+            // Final update
+            console.log('[WebSearch Debug] Final result:', {
+                content: result.content?.substring(0, 200),
+                reasoning: collectedReasoning?.substring(0, 100),
+                toolCalls: result.toolCalls
+            });
+
+            setIsStreaming(false);
+            const finalAssistantMessage = {
+                role: 'assistant',
+                content: result.content,
+                reasoning: collectedReasoning || result.reasoning
+            };
+
+            // Add webSearch info to the final message for UI display
+            if (collectedWebSearch) {
+                finalAssistantMessage.webSearch = collectedWebSearch;
+            }
+
+            const finalMessages = [...currentMessages, finalAssistantMessage];
+            setMessages(finalMessages);
+
+            // Save session
+            let sessionUpdate = {
+                messages: finalMessages,
+                model: selectedModel,
+                params
+            };
+
+            const session = await getChatSession(activeSessionId);
+            if (session && (!session.messages || session.messages.length === 0)) {
+                const title = originalInput.trim().slice(0, 40) + (originalInput.length > 40 ? '...' : '');
+                sessionUpdate.name = title;
+            }
+
+            await updateChatSession(activeSessionId, sessionUpdate);
+            const updatedSessions = await getChatSessions();
+            setSessions(updatedSessions);
+
+        } catch (error) {
+            console.error('Stream error:', error);
+            setIsStreaming(false);
+            setIsSearching(false);
+            setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                    role: 'assistant',
+                    content: `Error: ${error.message}`,
+                    reasoning: ''
+                };
+                return updated;
+            });
+        }
     };
 
     const handleKeyDown = (e) => {
@@ -584,13 +840,28 @@ const ChatPlayground = () => {
                         ))}
                     </select>
 
-                    <button
-                        className="btn-icon"
-                        onClick={() => setShowParams(true)}
-                        title={t('playground.settings') || 'Settings'}
-                    >
-                        <VscSettingsGear size={20} />
-                    </button>
+                    <div className="header-actions">
+                        <button
+                            className={`btn-icon web-search-toggle ${enableWebSearch ? 'active' : ''}`}
+                            onClick={() => setEnableWebSearch(!enableWebSearch)}
+                            title={enableWebSearch ? 'Web Search: ON (click to disable)' : 'Web Search: OFF (click to enable)'}
+                            disabled={isStreaming}
+                        >
+                            {isSearching ? (
+                                <span className="search-spinner">🔄</span>
+                            ) : (
+                                <span style={{ fontSize: '18px' }}>🌐</span>
+                            )}
+                        </button>
+
+                        <button
+                            className="btn-icon"
+                            onClick={() => setShowParams(true)}
+                            title={t('playground.settings') || 'Settings'}
+                        >
+                            <VscSettingsGear size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="chat-messages">
@@ -599,25 +870,33 @@ const ChatPlayground = () => {
                             <p>{t('playground.startChat') || 'Start a new conversation'}</p>
                         </div>
                     ) : (
-                        messages.map((msg, index) => (
-                            <ChatMessage
-                                key={index}
-                                index={index}
-                                message={msg}
-                                isStreaming={isStreaming && index === messages.length - 1}
-                                onEdit={handleEditMessage}
-                                canEdit={!isStreaming && msg.role === 'user'}
-                                showVersionNav={hasVersionHistory && index === revertedAtIndex}
-                                versionInfo={{
-                                    current: versionIndex + 1,
-                                    total: messageVersions.length,
-                                    canGoBack: canGoBack && !isStreaming,
-                                    canGoForward: canGoForward && !isStreaming,
-                                    onBack: () => handleVersionNav('back'),
-                                    onForward: () => handleVersionNav('forward')
-                                }}
-                            />
-                        ))
+                        messages
+                            .filter(msg => {
+                                // Hide tool role messages
+                                if (msg.role === 'tool') return false;
+                                // Hide assistant messages that only have tool_calls (no content)
+                                if (msg.role === 'assistant' && msg.tool_calls && !msg.content) return false;
+                                return true;
+                            })
+                            .map((msg, index) => (
+                                <ChatMessage
+                                    key={index}
+                                    index={index}
+                                    message={msg}
+                                    isStreaming={isStreaming && index === messages.filter(m => m.role !== 'tool' && !(m.role === 'assistant' && m.tool_calls && !m.content)).length - 1}
+                                    onEdit={handleEditMessage}
+                                    canEdit={!isStreaming && msg.role === 'user'}
+                                    showVersionNav={hasVersionHistory && index === revertedAtIndex}
+                                    versionInfo={{
+                                        current: versionIndex + 1,
+                                        total: messageVersions.length,
+                                        canGoBack: canGoBack && !isStreaming,
+                                        canGoForward: canGoForward && !isStreaming,
+                                        onBack: () => handleVersionNav('back'),
+                                        onForward: () => handleVersionNav('forward')
+                                    }}
+                                />
+                            ))
                     )}
                     <div ref={messagesEndRef} />
                 </div>

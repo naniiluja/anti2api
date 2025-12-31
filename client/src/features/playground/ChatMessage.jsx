@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ShinyText from '../../components/common/ShinyText';
+import WebSearchResults from './WebSearchResults';
 import { useI18n } from '../../context/I18nContext';
 
 const getTextContent = (content) => {
@@ -142,6 +143,15 @@ const ChatMessage = ({ message, isStreaming, index, onEdit, canEdit, showVersion
                         </div>
                     ))}
                 </div>
+            )}
+
+            {/* Web Search Results */}
+            {message.webSearch && (
+                <WebSearchResults
+                    query={message.webSearch.query}
+                    results={message.webSearch.results}
+                    isSearching={message.webSearch.isSearching}
+                />
             )}
 
             <div className="message-content markdown-body">

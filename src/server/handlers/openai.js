@@ -70,7 +70,20 @@ export const handleOpenAIRequest = async (req, res) => {
     if (isImageModel) {
       prepareImageRequest(requestBody);
     }
-    //console.log(JSON.stringify(requestBody,null,2));
+    
+    // Debug: Log request with tools
+    if (tools && tools.length > 0) {
+      logger.info(`[WebSearch Debug] Request with ${tools.length} tools`);
+    }
+    if (requestBody.request?.contents) {
+      logger.info(`[WebSearch Debug] Messages count: ${requestBody.request.contents.length}`);
+      requestBody.request.contents.forEach((msg, i) => {
+        const hasToolCall = msg.parts?.some(p => p.functionCall);
+        const hasFunctionResponse = msg.parts?.some(p => p.functionResponse);
+        logger.info(`  [${i}] role=${msg.role}, hasToolCall=${hasToolCall}, hasFunctionResponse=${hasFunctionResponse}`);
+      });
+    }
+    
     const { id, created } = createResponseMeta();
     const maxRetries = Number(config.retryTimes || 0);
     const safeRetries = maxRetries > 0 ? Math.floor(maxRetries) : 0;

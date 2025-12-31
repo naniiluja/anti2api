@@ -2,6 +2,55 @@ import axiosClient from '../../api/axiosClient';
 
 const API_BASE = '/v1';
 const SD_API_BASE = '/sdapi/v1';
+const ADMIN_API_BASE = '/admin';
+
+// Generate web search tool with current date for accurate queries
+export const getWebSearchTool = () => {
+    const today = new Date();
+    const dateStr = today.toLocaleDateString('vi-VN', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    
+    return {
+        type: 'function',
+        function: {
+            name: 'web_search',
+            description: `Search the web for current information. Today's date is ${dateStr}. Use this when you need up-to-date information, news, real-time data, or facts. Include today's date in your search query when searching for current prices, weather, or daily information. For example, use "giá vàng hôm nay ${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}" instead of just "giá vàng hôm nay".`,
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: {
+                        type: 'string',
+                        description: `The search query. Include today's date (${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}) when searching for current/daily information.`
+                    }
+                },
+                required: ['query']
+            }
+        }
+    };
+};
+
+// Legacy export for backward compatibility
+export const WEB_SEARCH_TOOL = getWebSearchTool();
+
+// Execute web search via backend API
+export const webSearch = async (query) => {
+    const response = await axiosClient.post(`${ADMIN_API_BASE}/web-search`, { query, maxResults: 5 });
+    return response.data;
+};
+
+// Format search results for AI context
+export const formatSearchResults = (results) => {
+    if (!results || results.length === 0) {
+        return 'No search results found.';
+    }
+    return results.map((r, i) => 
+        `[${i + 1}] ${r.title}\nURL: ${r.url}\n${r.description}`
+    ).join('\n\n');
+};
 
 // Fetch all models
 export const getModels = async () => {
@@ -24,18 +73,25 @@ export const getImageModels = async () => {
 // Stream chat completion
 export const streamChatCompletion = async (messages, model, params = {}, onChunk, onDone, onError) => {
     try {
+        const requestBody = {
+            model,
+            messages,
+            stream: true,
+            ...params
+        };
+        
+        // Debug: log if tools are being sent
+        if (requestBody.tools) {
+            console.log('[WebSearch] Sending request with tools:', requestBody.tools);
+        }
+
         const response = await fetch(`${API_BASE}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('authToken')}`
             },
-            body: JSON.stringify({
-                model,
-                messages,
-                stream: true,
-                ...params
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
